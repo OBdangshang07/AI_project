@@ -1,0 +1,1344 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>宏大都市实时渲染器 · METROPOLIS ENGINE</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:#04060c;
+    font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;color:#dfe6f5;
+    user-select:none;-webkit-user-select:none}
+  #scene{position:fixed;inset:0;z-index:1}
+  .glass{background:rgba(10,15,28,.58);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+    border:1px solid rgba(140,170,255,.16);border-radius:14px;box-shadow:0 4px 30px rgba(0,0,0,.45)}
+  #title{position:fixed;top:14px;left:16px;z-index:10;padding:8px 16px;font-size:13px;
+    letter-spacing:1.5px;color:#b9c8ee}
+  #title b{color:#fff;font-weight:600}
+  #fps{position:fixed;top:14px;right:16px;z-index:10;padding:8px 16px;font-size:12px;
+    color:#9fe8b0;min-width:150px;text-align:center;font-variant-numeric:tabular-nums}
+  #clockBar{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10;
+    display:flex;align-items:center;gap:10px;padding:7px 14px}
+  #clock{font-size:16px;letter-spacing:2px;color:#e8efff;font-variant-numeric:tabular-nums}
+  #phase{font-size:11px;color:rgba(255,200,130,.9);letter-spacing:1px}
+  #clockBar button{background:rgba(90,130,255,.14);border:1px solid rgba(140,170,255,.3);
+    color:#d8e4ff;font-size:12px;padding:4px 10px;border-radius:8px;cursor:pointer;transition:all .2s}
+  #clockBar button:hover{background:rgba(110,150,255,.32)}
+  #ctrlPanel{position:fixed;right:16px;top:64px;width:284px;z-index:10;padding:10px 12px;
+    max-height:calc(100vh - 170px);overflow-y:auto;scrollbar-width:thin}
+  #ctrlPanel::-webkit-scrollbar{width:5px}
+  #ctrlPanel::-webkit-scrollbar-thumb{background:rgba(120,150,230,.35);border-radius:3px}
+  #ctrlPanel h3{font-size:14px;font-weight:600;color:#fff;letter-spacing:1px;padding:2px 6px 8px}
+  #ctrlPanel details{margin:4px 0;border-top:1px solid rgba(140,170,255,.1)}
+  #ctrlPanel summary{cursor:pointer;font-size:11.5px;color:rgba(160,185,245,.85);letter-spacing:2.5px;
+    font-weight:600;padding:8px 4px 5px;list-style:none;outline:none}
+  #ctrlPanel summary::before{content:'▸ ';color:rgba(140,170,255,.6)}
+  #ctrlPanel details[open] summary::before{content:'▾ '}
+  #ctrlPanel details[open] summary{color:#cfe0ff}
+  .sliderRow{display:grid;grid-template-columns:86px 1fr 46px;align-items:center;gap:7px;
+    margin:5px 0;font-size:11.5px}
+  .sliderRow span{color:rgba(185,198,238,.8);white-space:nowrap;overflow:hidden}
+  .sliderRow b{text-align:right;color:#9fd0ff;font-weight:600;font-size:11px;font-variant-numeric:tabular-nums}
+  .togRow{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:11.5px;
+    color:rgba(205,216,242,.9);cursor:pointer;padding-left:2px}
+  .togRow input{accent-color:#6f9bff;width:13px;height:13px;cursor:pointer}
+  .seedRow{display:grid;grid-template-columns:86px 1fr 30px;align-items:center;gap:7px;margin:5px 0;font-size:11.5px}
+  .seedRow span{color:rgba(185,198,238,.8)}
+  .seedRow input[type=number]{width:100%;background:rgba(20,28,50,.6);border:1px solid rgba(140,170,255,.25);
+    border-radius:7px;color:#d8e4ff;font-size:11.5px;padding:4px 6px;outline:none;font-family:inherit}
+  .seedRow button,#ctrlPanel .btn{background:rgba(90,130,255,.14);border:1px solid rgba(140,170,255,.3);
+    color:#d8e4ff;font-size:11.5px;padding:5px 8px;border-radius:8px;cursor:pointer;transition:all .2s}
+  .seedRow button:hover,#ctrlPanel .btn:hover{background:rgba(110,150,255,.32);
+    box-shadow:0 0 12px rgba(120,160,255,.3)}
+  #ctrlPanel .btn{width:100%;margin-top:6px}
+  .selRow{display:grid;grid-template-columns:86px 1fr;align-items:center;gap:7px;margin:5px 0;font-size:11.5px}
+  .selRow span{color:rgba(185,198,238,.8)}
+  .selRow select{background:rgba(20,28,50,.7);border:1px solid rgba(140,170,255,.25);border-radius:7px;
+    color:#d8e4ff;font-size:11.5px;padding:4px 6px;outline:none;font-family:inherit;cursor:pointer}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;
+    background:rgba(120,150,230,.3);outline:none;cursor:pointer}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+    background:#8db4ff;box-shadow:0 0 8px rgba(140,180,255,.8);cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;border:none;
+    background:#8db4ff;box-shadow:0 0 8px rgba(140,180,255,.8);cursor:pointer}
+  #presets{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:10;
+    display:flex;gap:7px;padding:8px 10px}
+  #presets button{background:rgba(90,130,255,.12);border:1px solid rgba(140,170,255,.25);
+    color:#cfdcff;font-size:12px;padding:6px 13px;border-radius:9px;cursor:pointer;
+    letter-spacing:1px;transition:all .2s;white-space:nowrap}
+  #presets button:hover{background:rgba(110,150,255,.32);box-shadow:0 0 14px rgba(120,160,255,.35)}
+  #hint{position:fixed;bottom:14px;left:16px;z-index:10;padding:7px 14px;font-size:11px;
+    color:rgba(180,195,235,.55);letter-spacing:.5px}
+  #toast{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);z-index:11;
+    padding:8px 20px;font-size:12px;color:#ffe9b0;letter-spacing:1px;display:none}
+  body.hudHidden .hud{display:none}
+  @media (max-width:900px){#ctrlPanel{display:none}}
+</style>
+</head>
+<body>
+<div id="scene"></div>
+
+<div id="title" class="glass hud"><b>宏大都市</b> · METROPOLIS ENGINE</div>
+<div id="fps" class="glass hud">FPS --</div>
+<div id="clockBar" class="glass hud">
+  <button id="playBtn" title="空格键">⏸</button>
+  <span id="clock">18:00</span><span id="phase">黄昏</span>
+</div>
+<div id="ctrlPanel" class="glass hud"><h3>渲染控制台 · <span id="pcount"></span> 项可调</h3></div>
+<div id="presets" class="glass hud"></div>
+<div id="hint" class="glass hud">左键旋转 · 滚轮缩放 · 右键平移 · 空格 播放/暂停 · G 隐藏界面 · F 全屏</div>
+<div id="toast" class="glass"></div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { FXAAShader } from 'three/addons/shaders/FXAAShader.js';
+import * as BufferGeometryUtils from 'three/addons/utils/BufferGeometryUtils.js';
+
+/* ================= 工具 ================= */
+const DEG = Math.PI/180;
+const clamp = (x,a,b)=>Math.min(b,Math.max(a,x));
+const lerp = (a,b,t)=>a+(b-a)*t;
+const sstep = (a,b,x)=>{ const t=clamp((x-a)/(b-a),0,1); return t*t*(3-2*t); };
+const lerpC = (a,b,t,o)=>{ o.r=lerp(a.r,b.r,t); o.g=lerp(a.g,b.g,t); o.b=lerp(a.b,b.b,t); return o; };
+function mulberry32(s){ return function(){ s|=0; s=s+0x6D2B79F5|0; let t=Math.imul(s^s>>>15,1|s);
+  t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+// 与 GLSL hash12 完全一致的 CPU 版本（用于灯柱/纹理数据生成）
+function hash2(x,y){
+  let px=(x*0.1031)%1, py=(y*0.1031)%1, pz=(x*0.1031)%1;
+  px=px<0?px+1:px; py=py<0?py+1:py; pz=pz<0?pz+1:pz;
+  const d = px*(py+33.33)+py*(pz+33.33)+pz*(px+33.33);
+  px+=d; py+=d; pz+=d;
+  return (((px+py)*pz)%1+1)%1;
+}
+
+/* ================= 参数状态（60+ 项） ================= */
+const DEFAULTS = {
+  // 城市形态
+  seed: 20260719, gridN: 8, blockSize: 62, roadW: 15, density: 0.92,
+  maxH: 240, falloff: 1.15, hJitter: 0.75, glassR: 0.34, brickR: 0.22,
+  parkR: 0.07, treeD: 0.7, antennaOn: true,
+  // 时间与太阳
+  timeOfDay: 18.1, timeSpeed: 30, playing: true, azOffset: 0, latitude: 32, declin: 12,
+  // 天气与大气
+  cloudCov: 0.38, cloudDense: 0.8, windSpeed: 6, fogD: 0.4, turbidity: 4.5,
+  rain: 0, storm: false, wet: 0.25, starInt: 1.0,
+  // 光照与渲染
+  sunInt: 3.4, ambient: 0.55, moonInt: 0.5, shadowOn: true, shadowQ: 2048,
+  litRatio: 0.42, winLight: 1.15, winDensity: 0.55, lampDens: 0.8, lampInt: 1.2,
+  headInt: 1.4, rayleighS: 1.0, sunDisc: 1.0,
+  // 城市动态
+  carCount: 220, carSpeed: 1.0,
+  // 后期效果
+  bloomS: 0.35, bloomT: 1.25, bloomR: 0.35, exposure: 1.12, contrast: 1.05,
+  saturation: 1.08, temp: 0.52, vignette: 0.42, grain: 0.25, ca: 0.1, sharp: 0.3, fxaa: true,
+  // 相机与性能
+  fov: 55, autoRotate: false, rotSpeed: 0.5, prScale: 1.0, adaptive: true, showHud: true,
+};
+const STATE = Object.assign({}, DEFAULTS);
+let paramCount = 0;
+
+// GUI 结构定义：[key, 标签, 类型, min, max, step]  type: r=range t=toggle s=select
+const SCHEMA = [
+ ['城市形态', [
+   ['seed','随机种子','seed'],
+   ['gridN','城市半径','r',3,12,1,' 街区'],
+   ['blockSize','街区尺寸','r',40,100,1,' m'],
+   ['roadW','道路宽度','r',8,26,0.5,' m'],
+   ['density','建筑密度','r',0.2,1,0.01],
+   ['maxH','最大楼高','r',80,480,5,' m'],
+   ['falloff','中心聚集','r',0.2,3,0.05],
+   ['hJitter','高度随机','r',0,1,0.01],
+   ['glassR','玻璃幕墙','r',0,0.8,0.01],
+   ['brickR','砖石建筑','r',0,0.8,0.01],
+   ['parkR','公园比例','r',0,0.3,0.01],
+   ['treeD','植被密度','r',0,1,0.01],
+   ['antennaOn','屋顶天线','t'],
+ ]],
+ ['时间与太阳', [
+   ['timeOfDay','时刻','r',0,24,0.05,''],
+   ['timeSpeed','时间流速','r',0,240,1,' 分/秒'],
+   ['azOffset','方位偏移','r',-180,180,1,'°'],
+   ['latitude','地理纬度','r',-60,60,0.5,'°'],
+   ['declin','太阳赤纬','r',-23.4,23.4,0.1,'°'],
+ ]],
+ ['天气与大气', [
+   ['cloudCov','云量','r',0,1,0.01],
+   ['cloudDense','云层厚度','r',0.1,1.5,0.01],
+   ['windSpeed','风速','r',0,30,0.5,' m/s'],
+   ['fogD','雾浓度','r',0,2.5,0.01],
+   ['turbidity','大气浑浊度','r',1,16,0.1],
+   ['rain','降雨量','r',0,1,0.01],
+   ['storm','雷暴','t'],
+   ['wet','地面湿润','r',0,1,0.01],
+   ['starInt','星空强度','r',0,2.5,0.05],
+ ]],
+ ['光照与渲染', [
+   ['sunInt','日照强度','r',0,7,0.05],
+   ['ambient','环境光','r',0,1.6,0.01],
+   ['moonInt','月光强度','r',0,1.6,0.01],
+   ['shadowOn','动态阴影','t'],
+   ['shadowQ','阴影精度','s',[[512,'512'],[1024,'1024'],[2048,'2048'],[4096,'4096']]],
+   ['litRatio','窗灯点亮率','r',0,1,0.01],
+   ['winLight','窗灯亮度','r',0,4,0.05],
+   ['winDensity','窗户密度','r',0,1,0.01],
+   ['lampDens','路灯密度','r',0,1,0.01],
+   ['lampInt','路灯亮度','r',0,3,0.05],
+   ['headInt','车灯亮度','r',0,3,0.05],
+   ['rayleighS','散射强度','r',0.2,3,0.05],
+   ['sunDisc','太阳尺寸','r',0.3,3,0.05],
+ ]],
+ ['城市动态', [
+   ['carCount','车辆数量','r',0,600,10,' 辆'],
+   ['carSpeed','车流速度','r',0,3,0.05],
+ ]],
+ ['后期效果', [
+   ['bloomS','泛光强度','r',0,1.6,0.01],
+   ['bloomT','泛光阈值','r',0.3,1.5,0.01],
+   ['bloomR','泛光半径','r',0,1.2,0.01],
+   ['exposure','曝光','r',0.3,2.5,0.01],
+   ['contrast','对比度','r',0.6,1.6,0.01],
+   ['saturation','饱和度','r',0,2.2,0.01],
+   ['temp','色温','r',0,1,0.01],
+   ['vignette','暗角','r',0,1,0.01],
+   ['grain','胶片颗粒','r',0,1,0.01],
+   ['ca','色差','r',0,1.5,0.01],
+   ['sharp','锐化','r',0,1.5,0.01],
+   ['fxaa','FXAA 抗锯齿','t'],
+ ]],
+ ['相机与性能', [
+   ['fov','视野角','r',30,100,1,'°'],
+   ['autoRotate','自动巡航','t'],
+   ['rotSpeed','巡航速度','r',0.1,3,0.05],
+   ['prScale','渲染分辨率','r',0.5,2,0.05],
+   ['adaptive','自适应画质','t'],
+   ['showHud','显示界面','t'],
+ ]],
+];
+
+/* ================= 构建 GUI ================= */
+const panel = document.getElementById('ctrlPanel');
+const guiRefs = {};
+function buildGUI(){
+  for (const [title, items] of SCHEMA){
+    const det = document.createElement('details');
+    if (title==='城市形态' || title==='时间与太阳') det.open = true;
+    const sum = document.createElement('summary'); sum.textContent = title;
+    det.appendChild(sum);
+    for (const it of items){
+      const [k, label, type] = it;
+      if (type==='r'){
+        const row = document.createElement('div'); row.className='sliderRow';
+        const dec = it[5]<0.1?2:(it[5]<1?1:0);
+        row.innerHTML = `<span>${label}</span><input type="range" min="${it[3]}" max="${it[4]}" step="${it[5]}"><b></b>`;
+        const inp = row.querySelector('input'), val = row.querySelector('b');
+        inp.value = STATE[k];
+        val.textContent = (+STATE[k]).toFixed(dec)+(it[6]||'');
+        inp.addEventListener('input', ()=>{ STATE[k]=+inp.value;
+          val.textContent = (+inp.value).toFixed(dec)+(it[6]||''); onParam(k); });
+        guiRefs[k] = {inp, val, dec, unit: it[6]||''};
+        det.appendChild(row);
+      } else if (type==='t'){
+        const row = document.createElement('label'); row.className='togRow';
+        row.innerHTML = `<input type="checkbox"><span>${label}</span>`;
+        const inp = row.querySelector('input');
+        inp.checked = !!STATE[k];
+        inp.addEventListener('change', ()=>{ STATE[k]=inp.checked; onParam(k); });
+        guiRefs[k] = {inp, tog:true};
+        det.appendChild(row);
+      } else if (type==='s'){
+        const row = document.createElement('div'); row.className='selRow';
+        row.innerHTML = `<span>${label}</span><select>${it[3].map(o=>`<option value="${o[0]}">${o[1]}</option>`).join('')}</select>`;
+        const sel = row.querySelector('select');
+        sel.value = STATE[k];
+        sel.addEventListener('change', ()=>{ STATE[k]=+sel.value; onParam(k); });
+        guiRefs[k] = {inp: sel};
+        det.appendChild(row);
+      } else if (type==='seed'){
+        const row = document.createElement('div'); row.className='seedRow';
+        row.innerHTML = `<span>${label}</span><input type="number" step="1"><button title="随机">🎲</button>`;
+        const inp = row.querySelector('input'), btn = row.querySelector('button');
+        inp.value = STATE[k];
+        inp.addEventListener('change', ()=>{ STATE[k]=(+inp.value)|0; onParam(k); });
+        btn.addEventListener('click', ()=>{ STATE[k]=(Math.random()*1e9)|0; inp.value=STATE[k]; onParam(k); });
+        guiRefs[k] = {inp};
+        det.appendChild(row);
+      }
+      paramCount++;
+    }
+    panel.appendChild(det);
+  }
+  const regen = document.createElement('button'); regen.className='btn'; regen.textContent='🔄 重新生成城市';
+  regen.addEventListener('click', ()=>rebuildCity(true));
+  panel.appendChild(regen);
+  const reset = document.createElement('button'); reset.className='btn'; reset.textContent='↺ 重置全部参数';
+  reset.addEventListener('click', ()=>{ Object.assign(STATE, DEFAULTS); refreshUI(); rebuildCity(true); applyStatic(); });
+  panel.appendChild(reset);
+  document.getElementById('pcount').textContent = paramCount;
+}
+function refreshUI(){
+  for (const k in guiRefs){
+    const r = guiRefs[k];
+    if (r.tog) r.inp.checked = !!STATE[k];
+    else { r.inp.value = STATE[k]; if (r.val) r.val.textContent = (+STATE[k]).toFixed(r.dec)+r.unit; }
+  }
+}
+
+/* ================= 渲染器 / 场景 ================= */
+const renderer = new THREE.WebGLRenderer({ antialias:false, powerPreference:'high-performance' });
+renderer.toneMapping = THREE.NoToneMapping;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.shadowMap.enabled = STATE.shadowOn;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.getElementById('scene').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x9db4cc, 0.0009);
+const camera = new THREE.PerspectiveCamera(STATE.fov, innerWidth/innerHeight, 0.5, 16000);
+camera.position.set(620, 330, 620);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 60, 0);
+controls.enableDamping = true; controls.dampingFactor = 0.06;
+controls.maxPolarAngle = 88*DEG; controls.minDistance = 25; controls.maxDistance = 3200;
+
+/* 灯光 */
+const sunLight = new THREE.DirectionalLight(0xffffff, 3);
+sunLight.castShadow = STATE.shadowOn;
+sunLight.shadow.mapSize.set(STATE.shadowQ, STATE.shadowQ);
+sunLight.shadow.bias = -0.0002; sunLight.shadow.normalBias = 3.0;
+scene.add(sunLight); scene.add(sunLight.target);
+const hemi = new THREE.HemisphereLight(0xbcd4e8, 0x6b6f66, 0.6); scene.add(hemi);
+const amb = new THREE.AmbientLight(0xffffff, 0.2); scene.add(amb);
+
+/* ================= 大气散射天空 ================= */
+const skyUniforms = {
+  uSunDir:{value:new THREE.Vector3(0,1,0)}, uMoonDir:{value:new THREE.Vector3(0,-1,0)},
+  uRayleigh:{value:2.0}, uTurbidity:{value:4.5}, uMie:{value:0.005}, uG:{value:0.76},
+  uCloudCov:{value:0.4}, uCloudDense:{value:0.85}, uWindOff:{value:new THREE.Vector2()},
+  uNight:{value:0}, uStarInt:{value:1}, uMoonInt:{value:0.5}, uSunDisc:{value:1},
+  uFlash:{value:0}, uTime:{value:0}, uRain:{value:0}, uFogCol:{value:new THREE.Color(0x9db4cc)},
+};
+const skyMat = new THREE.ShaderMaterial({
+  uniforms: skyUniforms, side: THREE.BackSide, depthWrite:false, fog:false,
+  vertexShader:`
+    varying vec3 vDir;
+    void main(){ vDir = (modelMatrix*vec4(position,1.0)).xyz - cameraPosition;
+      gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader:`
+    varying vec3 vDir;
+    uniform vec3 uSunDir, uMoonDir;
+    uniform vec3 uFogCol;
+    uniform float uRayleigh,uTurbidity,uMie,uG,uCloudCov,uCloudDense,uNight,uStarInt,uMoonInt,uSunDisc,uFlash,uTime,uRain;
+    uniform vec2 uWindOff;
+    float hash12(vec2 p){ vec3 p3=fract(vec3(p.xyx)*0.1031); p3+=dot(p3,p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
+    float vnoise(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f);
+      float a=hash12(i),b=hash12(i+vec2(1,0)),c=hash12(i+vec2(0,1)),d=hash12(i+vec2(1,1));
+      return mix(mix(a,b,f.x),mix(c,d,f.x),f.y); }
+    float fbm(vec2 p){ float v=0.0,a=0.5; mat2 r=mat2(0.8,-0.6,0.6,0.8);
+      for(int i=0;i<5;i++){ v+=a*vnoise(p); p=r*p*2.03+11.7; a*=0.5; } return v; }
+    void main(){
+      vec3 dir = normalize(vDir);
+      vec3 sunDir = normalize(uSunDir);
+      float sunE = sunDir.y;
+      float up = max(dir.y, 0.0);
+      float zen = acos(clamp(dir.y,-1.0,1.0));
+      float inv = 1.0/(cos(zen)+0.15*pow(max(93.885-degrees(zen),0.5),-1.253));
+      inv = min(inv, 28.0);
+      float sR = 8400.0*inv, sM = 1250.0*inv;
+      float sunfade = 1.0-clamp(1.0-exp(sunE*2.5),0.0,1.0);
+      float rc = uRayleigh*(1.0-0.6*(1.0-sunfade));
+      vec3 betaR = vec3(5.8045e-6,1.3563e-5,3.0266e-5)*rc;
+      float mc = (0.2*uTurbidity)*1e-17;
+      vec3 betaM = 0.434*mc*vec3(1.84e14,2.78e14,4.08e14)*uMie;
+      vec3 Fex = exp(-(betaR*sR+betaM*sM));
+      float cosT = dot(dir,sunDir);
+      float rPhase = 0.0596831*(1.0+cosT*cosT);
+      float g2 = uG*uG;
+      float mPhase = 0.0795775*((1.0-g2)/pow(max(1.0+g2-2.0*uG*cosT,1e-4),1.5));
+      vec3 betaRTheta = betaR*rPhase;
+      vec3 betaMTheta = betaM*mPhase;
+      float sE = max(sunE,0.0);
+      // 单位向量太阳下的重写：散射项 * 柔和日光曲线 * 日落透射染色
+      vec3 scatter = ((betaRTheta+betaMTheta)/(betaR+betaM))*(1.0-Fex);
+      vec3 Lin = pow(scatter, vec3(1.5));
+      float dayLight = pow(sE, 0.55);
+      vec3 duskTint = mix(vec3(1.0), Fex*2.4, clamp(pow(1.0-dayLight,3.0),0.0,1.0));
+      Lin *= dayLight*duskTint*300.0;
+      vec3 L0 = vec3(0.1)*Fex;
+      float ang = acos(clamp(cosT,-1.0,1.0));
+      float sunRad = 0.0093*uSunDisc;
+      float sundisk = 1.0-smoothstep(sunRad*0.92, sunRad, ang);
+      L0 += sE*19000.0*Fex*sundisk;
+      vec3 col = Lin + L0*0.048 + vec3(0.0,0.001,0.00075);
+      // 地平线处与场景雾色无缝融合
+      vec3 fogHDR = uFogCol*(0.55+0.85*dayLight);
+      col = mix(fogHDR, col, smoothstep(-0.03, 0.20, dir.y));
+      col = min(col, vec3(90.0));
+      // 夜空基底 + 城市地平线辉光
+      vec3 nightCol = mix(vec3(0.004,0.006,0.013), vec3(0.012,0.016,0.030), pow(1.0-up,3.0));
+      nightCol += vec3(0.38,0.18,0.07)*pow(1.0-up,25.0)*0.035;
+      col = mix(col, nightCol, uNight*(1.0-sundisk));
+      // 星空
+      if (uNight>0.02 && dir.y>0.005){
+        vec2 sp = vec2(atan(dir.x,dir.z), asin(clamp(dir.y,-1.0,1.0)));
+        vec2 sg = sp*vec2(118.0,68.0);
+        vec2 cell = floor(sg), fr = fract(sg);
+        float h = hash12(cell);
+        if (h>0.984){
+          vec2 spos = vec2(hash12(cell+7.7),hash12(cell+3.3))*0.7+0.15;
+          float d = length(fr-spos);
+          float tw = 0.72+0.28*sin(uTime*(1.5+h*4.0)+h*40.0);
+          float star = (1.0-smoothstep(0.0,0.085,d))*tw;
+          col += vec3(0.9,0.93,1.0)*star*(0.35+0.65*hash12(cell+9.1))*uStarInt*uNight*smoothstep(0.0,0.1,dir.y);
+        }
+      }
+      // 月亮
+      float cosM = dot(dir, normalize(uMoonDir));
+      float mang = acos(clamp(cosM,-1.0,1.0));
+      float moonR = 0.0115;
+      float mdisc = 1.0-smoothstep(moonR*0.95, moonR, mang);
+      if (mang < moonR*7.0){
+        vec3 mx = normalize(cross(normalize(uMoonDir), vec3(0.0,1.0,0.0)));
+        vec3 my = cross(mx, normalize(uMoonDir));
+        vec2 muv = vec2(dot(dir,mx), dot(dir,my))/moonR;
+        float mn = fbm(muv*3.0+4.0);
+        vec3 mcol = mix(vec3(0.50,0.51,0.56), vec3(0.88,0.88,0.92), mn);
+        float limb = sqrt(max(1.0-dot(muv,muv),0.0));
+        col += mcol*mdisc*uMoonInt*uNight*2.4*(0.5+0.5*limb);
+        col += vec3(0.55,0.6,0.75)*(1.0-smoothstep(moonR,moonR*6.5,mang))*uMoonInt*uNight*0.22;
+      }
+      // 云层（FBM 双层 + 银边）
+      if (dir.y > 0.012){
+        vec2 cuv = dir.xz/(dir.y+0.18) + uWindOff;
+        float f1 = fbm(cuv);
+        float f2 = fbm(cuv*2.6+13.7);
+        float cl = f1*0.72+f2*0.28;
+        float cov = clamp(uCloudCov+uRain*0.4, 0.0, 1.0);
+        float dens = smoothstep(1.0-cov, 1.0-cov+0.42, cl)*(0.7+0.3*f2);
+        dens *= smoothstep(0.06, 0.35, dir.y);
+        dens = clamp(dens*uCloudDense, 0.0, 1.0);
+        vec2 sunXZ = normalize(sunDir.xz+vec2(1e-4));
+        float fS = fbm(cuv+sunXZ*0.07);
+        float edge = clamp((f1-fS)*5.0+0.35, 0.0, 1.0);
+        float duskF = exp(-pow(sunE/0.16, 2.0));
+        vec3 litC = mix(vec3(1.05,1.0,0.96), vec3(1.3,0.6,0.32), duskF*0.9)*(0.25+0.75*sE);
+        vec3 shdC = mix(vec3(0.58,0.62,0.70), vec3(0.42,0.30,0.30), duskF)*(0.2+0.55*sE);
+        vec3 cloudC = mix(shdC, litC, edge);
+        vec3 nightC = vec3(0.028,0.032,0.05)+vec3(0.35,0.36,0.45)*pow(max(cosM,0.0),8.0)*uMoonInt*0.5;
+        cloudC = mix(cloudC, nightC, uNight);
+        cloudC *= (1.0-uRain*0.45);
+        cloudC = min(cloudC, vec3(1.35));
+        col = mix(col, cloudC, dens);
+        col += uFlash*vec3(0.85,0.9,1.25)*(0.2+dens*1.6);
+      } else {
+        col += uFlash*vec3(0.85,0.9,1.25)*0.25;
+      }
+      gl_FragColor = vec4(col, 1.0);
+    }`
+});
+const skyMesh = new THREE.Mesh(new THREE.SphereGeometry(7200, 48, 24), skyMat);
+skyMesh.frustumCulled = false; skyMesh.renderOrder = -1;
+scene.add(skyMesh);
+
+/* ================= 太阳/月光状态与色彩曲线 ================= */
+const sunDir = new THREE.Vector3(), moonDir = new THREE.Vector3();
+const fogColor = new THREE.Color(), zenithCol = new THREE.Color(), horizonCol = new THREE.Color();
+const C = { // 调色板
+  fogDay:new THREE.Color(0x9fb6cc), fogDusk:new THREE.Color(0xd98950), fogNight:new THREE.Color(0x06080f),
+  sunNoon:new THREE.Color(0xfff3e0), sunLow:new THREE.Color(0xff5f1f), moon:new THREE.Color(0x8fa8cc),
+  hemiSkyDay:new THREE.Color(0xbdd5ea), hemiSkyNight:new THREE.Color(0x141c30),
+  hemiGndDay:new THREE.Color(0x707468), hemiGndNight:new THREE.Color(0x0d0b09),
+  zenithDay:new THREE.Color(0x3f6fae), zenithNight:new THREE.Color(0x05070f),
+};
+const sunState = { sinAlt:0, dayF:1, duskF:0, nightF:0, flash:0, flashT:5 };
+function computeSun(){
+  const phi = STATE.latitude*DEG, dec = STATE.declin*DEG;
+  const H = (STATE.timeOfDay-12)/12*Math.PI;
+  const sinAlt = clamp(Math.sin(phi)*Math.sin(dec)+Math.cos(phi)*Math.cos(dec)*Math.cos(H), -1, 1);
+  const alt = Math.asin(sinAlt);
+  const cosAz = clamp((Math.sin(dec)-sinAlt*Math.sin(phi))/(Math.cos(alt)*Math.cos(phi)+1e-6), -1, 1);
+  let az = Math.acos(cosAz); if (H>0) az = 2*Math.PI-az; az += STATE.azOffset*DEG;
+  sunDir.set(Math.sin(az)*Math.cos(alt), sinAlt, -Math.cos(az)*Math.cos(alt));
+  moonDir.copy(sunDir).negate();
+  const s = sunState;
+  s.sinAlt = sinAlt;
+  s.dayF = sstep(-0.09, 0.15, sinAlt);
+  s.duskF = Math.exp(-Math.pow((sinAlt+0.01)/0.14, 2));
+  s.nightF = 1 - sstep(-0.16, -0.03, sinAlt);
+  // 雾色（= 地平线天色）
+  lerpC(C.fogNight, C.fogDay, s.dayF, fogColor);
+  lerpC(fogColor, C.fogDusk, s.duskF*0.75*(1-s.nightF), fogColor);
+  const haze = clamp(STATE.turbidity/16,0,1)*0.25*s.dayF;
+  fogColor.lerp(new THREE.Color(0xc8ccd2), haze);
+  lerpC(fogColor, new THREE.Color(0x0a0c14), s.nightF*0.4, fogColor);
+  horizonCol.copy(fogColor);
+  lerpC(C.zenithNight, C.zenithDay, s.dayF, zenithCol);
+  zenithCol.lerp(C.fogDusk, s.duskF*0.3*(1-s.nightF));
+  // 主方向光：白天太阳 / 夜晚月亮
+  const sunUp = sstep(-0.06, 0.06, sinAlt);
+  const sunI = STATE.sunInt * sstep(-0.05, 0.1, sinAlt) * (0.3+0.7*sstep(0.02, 0.5, sinAlt));
+  const moonI = STATE.moonInt * s.nightF * 0.6 * clamp(moonDir.y*2,0.15,1);
+  if (sunUp > 0.5){ sunLight.position.copy(sunDir); lerpC(C.sunLow, C.sunNoon, sstep(0.02,0.55,sinAlt), sunLight.color); }
+  else { sunLight.position.copy(moonDir); sunLight.color.copy(C.moon); }
+  sunLight.intensity = lerp(moonI, sunI, sunUp) + s.flash*4;
+  sunLight.position.multiplyScalar(2200);
+  // 半球光 / 环境光
+  lerpC(C.hemiSkyNight, C.hemiSkyDay, s.dayF, hemi.color);
+  hemi.color.lerp(C.fogDusk, s.duskF*0.35*(1-s.nightF));
+  lerpC(C.hemiGndNight, C.hemiGndDay, s.dayF, hemi.groundColor);
+  hemi.groundColor.lerp(new THREE.Color(0x3a2410), s.nightF*0.5); // 城市光污染
+  hemi.intensity = STATE.ambient*(0.25+0.75*s.dayF) + s.nightF*0.22 + s.flash*1.5;
+  amb.intensity = 0.12 + 0.1*s.dayF;
+  // 雾
+  scene.fog.color.copy(fogColor);
+  scene.fog.density = STATE.fogD*0.0016*(1+s.nightF*0.15);
+}
+
+/* ================= 城市生成 ================= */
+let cityGroup = null;
+let buildingMesh=null, groundMesh=null, trunkMesh=null, crownMesh=null, lampMesh=null, antennaMesh=null;
+let lampPts=null, beaconPts=null, carMesh=null, lightPts=null, rainPts=null;
+let parkTex=null, lampTex=null;
+let cityR = 500, cityExt = 800, cityP = 77, carHalf = 600;
+let cars = [], beaconPos = [];
+const carMat4 = new THREE.Matrix4(), carQuat = new THREE.Quaternion(), carPos = new THREE.Vector3(), carScl = new THREE.Vector3(1,1,1);
+
+/* 建筑共享 uniforms */
+const bU = {
+  uTime:{value:0}, uNight:{value:0}, uWinLight:{value:1.6}, uLitRatio:{value:0.42},
+  uWinDensity:{value:0.55}, uHorizonCol:{value:new THREE.Color()}, uZenithCol:{value:new THREE.Color()},
+};
+/* 地面共享 uniforms */
+const gU = {
+  uPitch:{value:77}, uRoadW:{value:15}, uWet:{value:0.25}, uNight:{value:0}, uTime:{value:0},
+  uRain:{value:0}, uLampInt:{value:1.2}, uExtent:{value:800}, uGridHalf:{value:8}, uGridSize:{value:17},
+  uParkTex:{value:null}, uLampTex:{value:null}, uSkyCol:{value:new THREE.Color()}, uZenithCol:{value:new THREE.Color()},
+};
+const tU = { uTime:{value:0}, uWind:{value:6} };
+
+const GLSL_NOISE = `
+  float hash12(vec2 p){ vec3 p3=fract(vec3(p.xyx)*0.1031); p3+=dot(p3,p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
+  float vnoise(vec2 p){ vec2 i=floor(p),f=fract(p); f=f*f*(3.0-2.0*f);
+    float a=hash12(i),b=hash12(i+vec2(1,0)),c=hash12(i+vec2(0,1)),d=hash12(i+vec2(1,1));
+    return mix(mix(a,b,f.x),mix(c,d,f.x),f.y); }
+`;
+
+/* ---- 建筑材质：标准材质 + 程序化立面注入 ---- */
+function makeBuildingMaterial(){
+  const m = new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.8, metalness:0.06 });
+  m.onBeforeCompile = (sh)=>{
+    Object.assign(sh.uniforms, bU);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', `#include <common>
+        attribute vec4 aStyle;
+        varying vec4 vStyle; varying vec3 vLocal; varying vec3 vLocalN; varying vec3 vScale; varying float vDist;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        vLocal = position; vLocalN = normal; vStyle = aStyle;
+        vScale = vec3(length(instanceMatrix[0].xyz),length(instanceMatrix[1].xyz),length(instanceMatrix[2].xyz));`)
+      .replace('#include <project_vertex>', `#include <project_vertex>
+        vDist = -mvPosition.z;`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        varying vec4 vStyle; varying vec3 vLocal; varying vec3 vLocalN; varying vec3 vScale; varying float vDist;
+        uniform float uTime,uNight,uWinLight,uLitRatio,uWinDensity;
+        uniform vec3 uHorizonCol,uZenithCol;
+        ${GLSL_NOISE}
+        float bwRough; vec3 bwEmis; vec3 bwN; vec3 bwCol;`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      {
+        bwN = normalize(vLocalN);
+        float style = vStyle.x, seed = vStyle.y, ws = vStyle.z;
+        float lod = 1.0 - smoothstep(500.0, 1600.0, vDist);
+        float lodE = 1.0 - smoothstep(350.0, 1200.0, vDist);
+        bwEmis = vec3(0.0);
+        if (bwN.y < 0.5) {
+          vec3 wallCol; float glassy = step(style, 0.5);
+          if (style < 0.5){ wallCol = mix(vec3(0.17,0.20,0.25), vec3(0.21,0.25,0.31), fract(seed*7.1)); bwRough = 0.3; }
+          else if (style < 1.5){ wallCol = mix(vec3(0.60,0.58,0.55), vec3(0.48,0.50,0.54), fract(seed*3.7)); bwRough = 0.85; }
+          else { wallCol = mix(vec3(0.44,0.27,0.19), vec3(0.55,0.36,0.25), fract(seed*5.3)); bwRough = 0.9; }
+          float bwU; float bwV = vLocal.y * vScale.y;
+          if (abs(bwN.x) > abs(bwN.z)) bwU = (vLocal.z+0.5)*vScale.z; else bwU = (vLocal.x+0.5)*vScale.x;
+          float dens = uWinDensity;
+          float floorH = mix(4.6, 2.9, dens)*ws;
+          float colW = (style<0.5 ? mix(2.6,1.6,dens) : mix(3.8,2.3,dens));
+          float fy = bwV/floorH, fx = bwU/colW;
+          vec2 cell = floor(vec2(fx,fy));
+          vec2 cf = fract(vec2(fx,fy));
+          vec2 winSize = style<0.5 ? vec2(0.88,0.66) : (style<1.5 ? vec2(0.58,0.60) : vec2(0.45,0.52));
+          vec2 wmin = (1.0-winSize)*0.5, wmax = 1.0-wmin;
+          float inWin = step(wmin.x,cf.x)*step(cf.x,wmax.x)*step(wmin.y,cf.y)*step(cf.y,wmax.y);
+          float frame = smoothstep(0.0,0.05,cf.x)*smoothstep(0.0,0.05,1.0-cf.x)*smoothstep(0.0,0.07,cf.y)*smoothstep(0.0,0.07,1.0-cf.y);
+          float h1 = hash12(cell+seed*97.0);
+          float h2 = hash12(cell*1.31+seed*57.0);
+          float h3 = hash12(cell*1.77+seed*23.0);
+          float hgt = clamp(bwV/240.0, 0.0, 1.0);
+          vec3 skyRef = mix(uHorizonCol, uZenithCol, hgt)*(0.3+0.45*h2);
+          vec3 glass = mix(vec3(0.035,0.045,0.065), skyRef, 0.6);
+          wallCol *= 0.92+0.08*smoothstep(0.0,0.08,cf.y);   // 楼板线
+          wallCol *= mix(0.5, 1.0, smoothstep(0.0, 10.0, bwV)); // 底部 AO
+          float litBase = uLitRatio*max(uNight, 0.05);
+          float lit = step(h2, litBase*(0.5+1.0*h1));
+          vec3 warm = vec3(1.0,0.68,0.38), cool = vec3(0.72,0.84,1.0);
+          vec3 lampC = mix(warm, cool, step(0.72,h3));
+          float fl = h3>0.965 ? 0.55+0.45*sin(uTime*(3.0+h1*6.0)+h1*40.0) : 1.0;
+          float bright = (0.55+0.9*h1)*fl;
+          bwEmis = lampC*bright*inWin*lit*uWinLight;
+          vec3 winSurf = mix(glass, lampC*bright*0.3, lit*max(uNight,0.05));
+          bwCol = mix(wallCol, winSurf, inWin);
+          bwCol *= mix(0.72, 1.0, frame);
+          vec3 avg = mix(wallCol, glass, 0.35);
+          bwCol = mix(avg, bwCol, lod);
+          bwEmis *= lodE;
+        } else {
+          // 屋顶：沥青 + 女儿墙 + 空调机组
+          vec2 rp = vLocal.xz * vScale.xz;
+          float speck = hash12(floor(rp*3.0));
+          bwCol = vec3(0.15,0.15,0.16)*(0.75+0.5*speck);
+          float ex = min((vLocal.x+0.5)*vScale.x, (0.5-vLocal.x)*vScale.x);
+          float ez = min((vLocal.z+0.5)*vScale.z, (0.5-vLocal.z)*vScale.z);
+          bwCol *= mix(0.55, 1.0, smoothstep(0.25, 1.3, min(ex,ez)));
+          vec2 acId = floor(rp/6.0);
+          vec2 ac = fract(rp/6.0);
+          float acm = step(0.3,ac.x)*step(ac.x,0.7)*step(0.3,ac.y)*step(ac.y,0.7)*step(0.55,hash12(acId+seed));
+          bwCol = mix(bwCol, vec3(0.30,0.31,0.34), acm*0.85);
+          bwRough = 0.92;
+        }
+        diffuseColor.rgb = bwCol;
+      }`)
+      .replace('#include <roughnessmap_fragment>', `float roughnessFactor = bwRough;`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+        totalEmissiveRadiance += bwEmis;`);
+  };
+  return m;
+}
+
+/* ---- 地面材质：程序化道路/人行道/公园/湿滑反射 ---- */
+function makeGroundMaterial(){
+  const m = new THREE.MeshStandardMaterial({ color:0xffffff, roughness:0.95, metalness:0.0 });
+  m.onBeforeCompile = (sh)=>{
+    Object.assign(sh.uniforms, gU);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vWPos;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        vWPos = (modelMatrix*vec4(transformed,1.0)).xyz;`);
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', `#include <common>
+        varying vec3 vWPos;
+        uniform float uPitch,uRoadW,uWet,uNight,uTime,uRain,uLampInt,uExtent,uGridHalf,uGridSize;
+        uniform sampler2D uParkTex, uLampTex;
+        uniform vec3 uSkyCol,uZenithCol;
+        ${GLSL_NOISE}
+        float gRough; float gRoadM; float gSwM;`)
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      {
+        vec2 gp = vWPos.xz;
+        float P = uPitch, RW = uRoadW;
+        vec2 cellF = gp/P;
+        vec2 l = fract(cellF)*P;
+        vec2 dl = abs(l - 0.5*P);            // 距两条道路中心线
+        float rx = 1.0-step(RW*0.5, dl.y);   // 沿 X 方向道路
+        float ry = 1.0-step(RW*0.5, dl.x);   // 沿 Z 方向道路
+        float road = max(rx, ry);
+        float inter = rx*ry;
+        vec2 sd = dl - RW*0.5;               // 超出路缘的距离
+        float swBand = max( step(0.0,sd.x)*(1.0-step(2.6,sd.x))*step(0.0,sd.y),
+                            step(0.0,sd.y)*(1.0-step(2.6,sd.y))*step(0.0,sd.x) );
+        float inCity = 1.0 - smoothstep(uExtent, uExtent+260.0, max(abs(gp.x),abs(gp.y)));
+        swBand *= inCity;
+        float blockIn = (1.0-road)*(1.0-swBand);
+        // 公园查询
+        vec2 cellId = floor(cellF+0.5);
+        vec2 puv = (cellId + uGridHalf + 0.5)/uGridSize;
+        float park = texture2D(uParkTex, puv).r;
+        // 沥青
+        float n1 = vnoise(gp*1.6), n2 = vnoise(gp*0.13);
+        vec3 asphalt = vec3(0.085,0.087,0.092)*(0.8+0.35*n1)*(0.85+0.3*n2);
+        // 车辙磨损
+        float wear = exp(-pow((dl.y-RW*0.25)/1.4,2.0))*rx + exp(-pow((dl.x-RW*0.25)/1.4,2.0))*ry;
+        asphalt *= 1.0 - wear*0.12;
+        vec3 col = asphalt;
+        // 标线
+        float mark = 0.0;
+        float cDash = step(fract(l.x/7.0), 0.55)*step(dl.y, 0.13)*rx*(1.0-inter)
+                    + step(fract(l.y/7.0), 0.55)*step(dl.x, 0.13)*ry*(1.0-inter);
+        float edgeL = (1.0-step(0.10, abs(dl.y-(RW*0.5-0.55))))*rx + (1.0-step(0.10, abs(dl.x-(RW*0.5-0.55))))*ry;
+        float laneD = step(fract(l.x/9.0),0.4)*(1.0-step(0.09,abs(dl.y-RW*0.25)))*rx*(1.0-inter)
+                    + step(fract(l.y/9.0),0.4)*(1.0-step(0.09,abs(dl.x-RW*0.25)))*ry*(1.0-inter);
+        mark = clamp(cDash + edgeL + laneD*0.5, 0.0, 1.0);
+        // 斑马线（路口四周）
+        float zebra = 0.0;
+        if (road>0.5 && inter<0.5){
+          float b = rx>0.5 ? sd.x : sd.y;
+          if (b>0.7 && b<4.3){ float across = rx>0.5 ? l.y : l.x; zebra = step(fract(across/0.95),0.55); }
+        }
+        mark = clamp(mark + zebra, 0.0, 1.0);
+        col = mix(col, vec3(0.55,0.56,0.55), mark*(0.5+0.3*n1)*inCity);
+        // 人行道
+        vec3 side = vec3(0.30,0.30,0.31)*(0.85+0.3*n1);
+        side *= 0.88+0.12*step(0.06,fract(l.x/1.6))*step(0.06,fract(l.y/1.6));
+        col = mix(col, side, swBand);
+        // 街区内部：公园草地 / 空置地
+        vec3 grass = vec3(0.09,0.17,0.06)*(0.7+0.6*vnoise(gp*2.6));
+        vec3 vacant = vec3(0.13,0.13,0.135)*(0.8+0.4*n1);
+        vec3 dirt = vec3(0.10,0.09,0.07)*(0.8+0.4*vnoise(gp*0.9));
+        col = mix(col, mix(vacant, grass, park), blockIn);
+        col = mix(dirt, col, inCity);
+        col *= 1.0 - uWet*0.32*max(road, swBand);   // 湿地面变深
+        gRough = mix(mix(0.95, 0.9, road), 0.18, uWet*max(road,swBand));
+        gRoadM = road; gSwM = swBand;
+        diffuseColor.rgb = col;
+      }`)
+      .replace('#include <roughnessmap_fragment>', `float roughnessFactor = gRough;`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      {
+        vec3 V = normalize(vViewPosition);
+        float fres = pow(1.0-abs(dot(normal, V)), 3.0);
+        totalEmissiveRadiance += mix(uSkyCol, uZenithCol, 0.4)*fres*uWet*max(gRoadM,gSwM)*0.20;
+        // 路灯光晕池（角落）
+        vec2 ip = (floor(vWPos.xz/uPitch)+0.5)*uPitch;
+        vec2 rel = vWPos.xz - ip;
+        vec2 sgn = vec2(rel.x>0.0?1.0:-1.0, rel.y>0.0?1.0:-1.0);
+        float off = uRoadW*0.5+1.7;
+        float dp = length(rel - sgn*off);
+        float pool = exp(-dp*dp*0.05);
+        vec2 kId = floor(vWPos.xz/uPitch);
+        vec2 luv = (kId + (uGridHalf+1.0) + 0.5)/(uGridSize+1.0);
+        vec4 corner = texture2D(uLampTex, luv);
+        float cIdx = (sgn.x>0.0?1.0:0.0)+(sgn.y>0.0?2.0:0.0);
+        float lampOn = cIdx<0.5 ? corner.r : (cIdx<1.5 ? corner.g : (cIdx<2.5 ? corner.b : corner.a));
+        totalEmissiveRadiance += vec3(1.0,0.60,0.26)*pool*lampOn*uLampInt*uNight*0.9;
+        // 雨天涟漪
+        if (uRain > 0.01){
+          vec2 rc = floor(vWPos.xz*1.8); vec2 rf = fract(vWPos.xz*1.8)-0.5;
+          float ph = fract(uTime*1.2+hash12(rc));
+          float ring = (1.0-smoothstep(0.0,0.05,abs(length(rf)-ph*0.42)))*(1.0-ph);
+          totalEmissiveRadiance += uSkyCol*ring*uRain*uWet*0.10*gRoadM;
+        }
+      }`);
+  };
+  return m;
+}
+
+/* ---- 光点材质（路灯光晕/车灯/航空障碍灯通用） ---- */
+function makeGlowMaterial(){
+  return new THREE.ShaderMaterial({
+    uniforms:{ uInt:{value:1}, uPointScale:{value:600}, uTime:{value:0} },
+    transparent:true, depthWrite:false, blending:THREE.AdditiveBlending,
+    vertexShader:`
+      attribute float aSize; attribute vec3 aCol; attribute float aBlink;
+      uniform float uPointScale, uTime, uInt;
+      varying vec3 vC; varying float vA;
+      void main(){
+        vec4 mv = modelViewMatrix*vec4(position,1.0);
+        gl_Position = projectionMatrix*mv;
+        float blink = aBlink>=0.0 ? (0.1+0.9*pow(0.5+0.5*sin(uTime*2.2+aBlink),3.0)) : 1.0;
+        vA = uInt*blink; vC = aCol;
+        gl_PointSize = clamp(aSize*uPointScale/max(-mv.z,1.0), 0.0, 96.0);
+      }`,
+    fragmentShader:`
+      varying vec3 vC; varying float vA;
+      void main(){
+        float d = length(gl_PointCoord-0.5)*2.0;
+        float a = pow(max(1.0-d,0.0), 2.2);
+        gl_FragColor = vec4(vC, a*vA);
+      }`
+  });
+}
+const lampGlowMat = makeGlowMaterial(), beaconMat = makeGlowMaterial(), headMat = makeGlowMaterial();
+
+/* ---- 雨滴 ---- */
+const RAIN_N = 2600;
+const rainMat = new THREE.ShaderMaterial({
+  uniforms:{ uTime:{value:0}, uCam:{value:new THREE.Vector3()}, uRain:{value:0}, uWind:{value:6}, uPointScale:{value:600} },
+  transparent:true, depthWrite:false,
+  vertexShader:`
+    attribute vec4 aSeed;
+    uniform float uTime, uWind, uPointScale;
+    uniform vec3 uCam;
+    void main(){
+      vec3 span = vec3(160.0, 95.0, 160.0);
+      vec3 v = aSeed.xyz*span;
+      float fall = 26.0+aSeed.w*12.0;
+      v.y = mod(v.y - uTime*fall, span.y);
+      v.x = mod(v.x + uTime*uWind*1.8, span.x);
+      vec3 world = vec3(uCam.x - span.x*0.5 + v.x, v.y, uCam.z - span.z*0.5 + v.z);
+      vec4 mv = viewMatrix*vec4(world,1.0);
+      gl_Position = projectionMatrix*mv;
+      gl_PointSize = clamp((0.8+aSeed.w*0.6)*uPointScale/max(-mv.z,1.0), 1.0, 8.0);
+    }`,
+  fragmentShader:`
+    uniform float uRain;
+    void main(){
+      vec2 q = abs(gl_PointCoord-0.5);
+      float a = (1.0-smoothstep(0.04,0.18,q.x))*(1.0-smoothstep(0.28,0.5,q.y));
+      gl_FragColor = vec4(vec3(0.72,0.80,0.92), a*0.5*uRain);
+    }`
+});
+
+/* ================= 重建城市 ================= */
+function disposeCity(){
+  if (!cityGroup) return;
+  cityGroup.traverse(o=>{ if (o.geometry) o.geometry.dispose(); });
+  scene.remove(cityGroup); cityGroup = null;
+}
+let rebuildTimer = null;
+function scheduleRebuild(){ clearTimeout(rebuildTimer); rebuildTimer = setTimeout(()=>rebuildCity(false), 260); }
+
+function rebuildCity(toast){
+  disposeCity();
+  cityGroup = new THREE.Group();
+  const rng = mulberry32(STATE.seed);
+  const H = STATE.gridN, BK = STATE.blockSize, RW = STATE.roadW, P = BK+RW;
+  const size = 2*H+1, lsize = 2*H+2;
+  cityP = P; cityR = (H+0.5)*P+80; cityExt = (H+0.5)*P+300; carHalf = (H+0.5)*P+P*0.5;
+  // 公园 / 路灯 数据纹理
+  const parkArr = new Uint8Array(size*size*4);
+  const lampArr = new Uint8Array(lsize*lsize*4);
+  const isPark = (bx,bz)=>((bz+H)*size+(bx+H))*4;
+  for (let bx=-H; bx<=H; bx++) for (let bz=-H; bz<=H; bz++){
+    const park = rng()<STATE.parkR ? 255:0;
+    parkArr[isPark(bx,bz)] = park;
+  }
+  for (let i=0;i<lsize*lsize;i++) for (let c=0;c<4;c++) lampArr[i*4+c] = rng()<STATE.lampDens?255:0;
+  parkTex = new THREE.DataTexture(parkArr, size, size, THREE.RGBAFormat);
+  lampTex = new THREE.DataTexture(lampArr, lsize, lsize, THREE.RGBAFormat);
+  for (const t of [parkTex, lampTex]){ t.magFilter=t.minFilter=THREE.NearestFilter; t.needsUpdate=true; }
+  gU.uParkTex.value = parkTex; gU.uLampTex.value = lampTex;
+  gU.uPitch.value = P; gU.uRoadW.value = RW; gU.uGridHalf.value = H; gU.uGridSize.value = size;
+  gU.uExtent.value = (H+0.5)*P+40;
+
+  /* ---- 建筑 ---- */
+  const bPos=[], bScale=[], bStyle=[];
+  for (let bx=-H; bx<=H; bx++) for (let bz=-H; bz<=H; bz++){
+    if (parkArr[isPark(bx,bz)]) continue;
+    const cx = bx*P, cz = bz*P;
+    const rd = Math.hypot(bx,bz)/(H+0.5);
+    const peak = Math.exp(-rd*rd*STATE.falloff*2.2);
+    const hBase = STATE.maxH*(0.06+0.94*peak);
+    for (let sx=0; sx<2; sx++) for (let sz=0; sz<2; sz++){
+      if (rng()>STATE.density) continue;
+      const lx = cx+(sx-0.5)*BK/2, lz = cz+(sz-0.5)*BK/2;
+      const margin = 1.6+rng()*2.6;
+      const maxF = BK/2-2*margin;
+      const w = Math.max(6, maxF*(0.55+0.45*rng()));
+      const d = Math.max(6, maxF*(0.55+0.45*rng()));
+      const jx = (rng()-0.5)*Math.max(0,(maxF-w))*0.9;
+      const jz = (rng()-0.5)*Math.max(0,(maxF-d))*0.9;
+      let h = hBase*(1-STATE.hJitter*(0.25+0.75*rng()));
+      if (bx===0&&bz===0&&sx===0&&sz===0) h = STATE.maxH*(0.95+0.05*rng());
+      if (rng()>0.994) h *= 1.45;
+      h = clamp(h, 7, STATE.maxH*1.5);
+      const rs = rng();
+      const style = rs<STATE.glassR?0:(rs>1-STATE.brickR?2:1);
+      bPos.push(lx+jx, lz+jz); bScale.push(w, h, d);
+      bStyle.push(style, rng(), 0.7+0.6*rng(), rng());
+    }
+  }
+  const bCount = bScale.length/3;
+  const boxGeo = new THREE.BoxGeometry(1,1,1); boxGeo.translate(0,0.5,0);
+  const styleAttr = new THREE.InstancedBufferAttribute(new Float32Array(bCount*4), 4);
+  boxGeo.setAttribute('aStyle', styleAttr);
+  buildingMesh = new THREE.InstancedMesh(boxGeo, makeBuildingMaterial(), bCount);
+  const m4 = new THREE.Matrix4(), q0 = new THREE.Quaternion(), p3 = new THREE.Vector3(), s3 = new THREE.Vector3();
+  for (let i=0;i<bCount;i++){
+    p3.set(bPos[i*2], 0, bPos[i*2+1]); s3.set(bScale[i*3], bScale[i*3+1], bScale[i*3+2]);
+    m4.compose(p3, q0, s3); buildingMesh.setMatrixAt(i, m4);
+    styleAttr.setXYZW(i, bStyle[i*4], bStyle[i*4+1], bStyle[i*4+2], bStyle[i*4+3]);
+  }
+  buildingMesh.castShadow = true; buildingMesh.receiveShadow = true;
+  cityGroup.add(buildingMesh);
+
+  /* ---- 地面 ---- */
+  groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(cityExt*2, cityExt*2).rotateX(-Math.PI/2), makeGroundMaterial());
+  groundMesh.receiveShadow = true;
+  cityGroup.add(groundMesh);
+
+  /* ---- 树木 ---- */
+  const treePos=[], treeScl=[];
+  const addTree = (x,z)=>{ if (treePos.length/2<2800){ treePos.push(x,z); treeScl.push(1.6+rng()*2.0, 1.0+rng()*0.9); } };
+  for (let bx=-H; bx<=H; bx++) for (let bz=-H; bz<=H; bz++){
+    const cx=bx*P, cz=bz*P;
+    if (parkArr[isPark(bx,bz)]){
+      const n = 8+(rng()*14|0);
+      for (let i=0;i<n;i++) addTree(cx+(rng()-0.5)*(BK-7), cz+(rng()-0.5)*(BK-7));
+    } else if (STATE.treeD>0.02){
+      const e = BK/2-1.5;
+      for (let t=-BK/2+5; t<BK/2-4; t+=9){
+        if (rng()<STATE.treeD*0.4) addTree(cx+t+(rng()-0.5)*2, cz-e);
+        if (rng()<STATE.treeD*0.4) addTree(cx+t+(rng()-0.5)*2, cz+e);
+        if (rng()<STATE.treeD*0.4) addTree(cx-e, cz+t+(rng()-0.5)*2);
+        if (rng()<STATE.treeD*0.4) addTree(cx+e, cz+t+(rng()-0.5)*2);
+      }
+    }
+  }
+  const tCount = treePos.length/2;
+  if (tCount>0){
+    const trunkGeo = new THREE.CylinderGeometry(0.14,0.2,2.4,5); trunkGeo.translate(0,1.2,0);
+    trunkMesh = new THREE.InstancedMesh(trunkGeo, new THREE.MeshStandardMaterial({color:0x4a3826, roughness:0.95}), tCount);
+    const crownGeo = new THREE.IcosahedronGeometry(1,1);
+    const crownMat = new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.9, flatShading:true});
+    crownMat.onBeforeCompile = (sh)=>{
+      Object.assign(sh.uniforms, tU);
+      sh.vertexShader = sh.vertexShader
+        .replace('#include <common>', '#include <common>\nuniform float uTime,uWind;')
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          transformed.x += sin(uTime*1.4+instanceMatrix[3][0]*0.37+instanceMatrix[3][2]*0.29)*uWind*0.02*max(position.y,0.0);
+          transformed.z += cos(uTime*1.1+instanceMatrix[3][0]*0.31)*uWind*0.015*max(position.y,0.0);`);
+    };
+    crownMesh = new THREE.InstancedMesh(crownGeo, crownMat, tCount);
+    const cc = new THREE.Color();
+    for (let i=0;i<tCount;i++){
+      const x=treePos[i*2], z=treePos[i*2+1], r=treeScl[i*2], yr=treeScl[i*2+1];
+      m4.compose(p3.set(x,0,z), q0, s3.set(1,1,1)); trunkMesh.setMatrixAt(i,m4);
+      m4.compose(p3.set(x,2.0+r*0.7,z), q0, s3.set(r, r*yr, r)); crownMesh.setMatrixAt(i,m4);
+      cc.setHSL(0.29+rng()*0.06, 0.5+rng()*0.2, 0.22+rng()*0.1); crownMesh.setColorAt(i, cc);
+    }
+    trunkMesh.castShadow = crownMesh.castShadow = true;
+    cityGroup.add(trunkMesh, crownMesh);
+  }
+
+  /* ---- 路灯（灯杆 + 光晕点） ---- */
+  const poleGeo = BufferGeometryUtils.mergeGeometries([
+    new THREE.CylinderGeometry(0.09,0.13,6.4,6).translate(0,3.2,0),
+    new THREE.CylinderGeometry(0.06,0.06,2.0,5).rotateX(Math.PI/2).translate(0,6.15,1.0),
+    new THREE.BoxGeometry(0.34,0.14,0.6).translate(0,6.2,1.9),
+  ]);
+  const lampPos=[], lampRot=[], glowPos=[];
+  const lq = new THREE.Quaternion(), eul = new THREE.Euler();
+  for (let kx=-H-1; kx<=H; kx++) for (let kz=-H-1; kz<=H; kz++){
+    const ix=(kx+0.5)*P, iz=(kz+0.5)*P;
+    const ti = ((kz+H+1)*lsize+(kx+H+1))*4;
+    const off = RW/2+1.7;
+    const corners = [[-1,-1],[1,-1],[-1,1],[1,1]];
+    for (let c=0;c<4;c++){
+      if (!lampArr[ti+c]) continue;
+      const [sx,sz] = corners[c];
+      lampPos.push(ix+sx*off, iz+sz*off);
+      lampRot.push(Math.atan2(-sx, -sz));
+      glowPos.push(ix+sx*off - sx*1.9, 6.3, iz+sz*off - sz*1.9);
+    }
+  }
+  if (lampPos.length){
+    lampMesh = new THREE.InstancedMesh(poleGeo, new THREE.MeshStandardMaterial({color:0x2c2f36, roughness:0.6, metalness:0.6}), lampPos.length/2);
+    for (let i=0;i<lampPos.length/2;i++){
+      lq.setFromEuler(eul.set(0,lampRot[i],0));
+      m4.compose(p3.set(lampPos[i*2],0,lampPos[i*2+1]), lq, s3.set(1,1,1));
+      lampMesh.setMatrixAt(i,m4);
+    }
+    lampMesh.castShadow = true;
+    cityGroup.add(lampMesh);
+    const gg = new THREE.BufferGeometry();
+    gg.setAttribute('position', new THREE.Float32BufferAttribute(glowPos,3));
+    const n = glowPos.length/3;
+    gg.setAttribute('aCol', new THREE.Float32BufferAttribute(new Float32Array(n*3).map((_,i)=>[1.35,0.78,0.36][i%3]),3));
+    gg.setAttribute('aSize', new THREE.Float32BufferAttribute(new Float32Array(n).fill(1.7),1));
+    gg.setAttribute('aBlink', new THREE.Float32BufferAttribute(new Float32Array(n).fill(-1),1));
+    lampPts = new THREE.Points(gg, lampGlowMat); lampPts.frustumCulled = false;
+    cityGroup.add(lampPts);
+  }
+
+  /* ---- 屋顶天线 + 障碍灯 ---- */
+  const antPos=[], antH=[], beacon=[];
+  if (STATE.antennaOn){
+    for (let i=0;i<bCount;i++){
+      const h = bScale[i*3+1];
+      if (h < STATE.maxH*0.58) continue;
+      const nA = 1+(rng()>0.75?1:0);
+      for (let a=0;a<nA;a++){
+        const x = bPos[i*2]+(rng()-0.5)*bScale[i*3]*0.5;
+        const z = bPos[i*2+1]+(rng()-0.5)*bScale[i*3+2]*0.5;
+        const ah = 7+rng()*15;
+        antPos.push(x, h, z); antH.push(ah);
+        beacon.push(x, h+ah, z, rng()*6.28);
+      }
+    }
+    const antGeo = new THREE.CylinderGeometry(0.10,0.16,1,5); antGeo.translate(0,0.5,0);
+    antennaMesh = new THREE.InstancedMesh(antGeo, new THREE.MeshStandardMaterial({color:0x3a3d44, roughness:0.5, metalness:0.7}), antPos.length/3);
+    for (let i=0;i<antPos.length/3;i++){
+      m4.compose(p3.set(antPos[i*3],antPos[i*3+1],antPos[i*3+2]), q0, s3.set(1,antH[i],1));
+      antennaMesh.setMatrixAt(i,m4);
+    }
+    cityGroup.add(antennaMesh);
+    const bg = new THREE.BufferGeometry();
+    const bp = new Float32Array(beacon.length/4*3), bph = new Float32Array(beacon.length/4);
+    const bc = new Float32Array(beacon.length/4*3), bs = new Float32Array(beacon.length/4);
+    for (let i=0;i<beacon.length/4;i++){
+      bp.set([beacon[i*4],beacon[i*4+1],beacon[i*4+2]], i*3); bph[i]=beacon[i*4+3];
+      bc.set([2.0,0.16,0.09], i*3); bs[i]=0.8;
+    }
+    bg.setAttribute('position', new THREE.Float32BufferAttribute(bp,3));
+    bg.setAttribute('aCol', new THREE.Float32BufferAttribute(bc,3));
+    bg.setAttribute('aSize', new THREE.Float32BufferAttribute(bs,1));
+    bg.setAttribute('aBlink', new THREE.Float32BufferAttribute(bph,1));
+    beaconPts = new THREE.Points(bg, beaconMat); beaconPts.frustumCulled = false;
+    cityGroup.add(beaconPts);
+  }
+
+  /* ---- 车流 ---- */
+  const MAXC = 600;
+  const body = new THREE.BoxGeometry(4.3,1.05,1.9); body.translate(0,0.85,0);
+  const cabin = new THREE.BoxGeometry(2.1,0.75,1.7); cabin.translate(-0.25,1.7,0);
+  const carGeo = BufferGeometryUtils.mergeGeometries([body, cabin]);
+  const carMat = new THREE.MeshStandardMaterial({color:0xffffff, roughness:0.35, metalness:0.5});
+  carMat.onBeforeCompile = (sh)=>{
+    Object.assign(sh.uniforms, { uNight:bU.uNight, uHead:{value:STATE.headInt} });
+    carMat.userData.shader = sh;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vLPos; varying vec3 vLN;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLPos = position; vLN = normal;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vLPos; varying vec3 vLN; uniform float uNight,uHead; vec3 cEmis;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+        cEmis = vec3(0.0);
+        if (vLPos.y > 1.32) diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05,0.065,0.085), 0.9);
+        if (vLN.x > 0.9) cEmis = vec3(1.3,1.2,0.95)*uHead*uNight;
+        if (vLN.x < -0.9) cEmis = vec3(1.4,0.06,0.03)*uHead*uNight;`)
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance += cEmis;');
+  };
+  carMesh = new THREE.InstancedMesh(carGeo, carMat, MAXC);
+  carMesh.castShadow = true;
+  const palette = [0xc8ccd2,0xe8e8ea,0x1a1c20,0x6a6e75,0xa02025,0x2040a0,0xd8a020];
+  const pw = [0.22,0.2,0.18,0.15,0.1,0.1,0.05];
+  const cc2 = new THREE.Color();
+  for (let i=0;i<MAXC;i++){
+    let r = rng(), ci = 0, acc = 0;
+    while (ci<pw.length-1 && (acc+=pw[ci])<r) ci++;
+    carMesh.setColorAt(i, cc2.setHex(palette[ci]));
+  }
+  // 车灯点
+  const hg = new THREE.BufferGeometry();
+  hg.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(MAXC*2*3),3).setUsage(THREE.DynamicDrawUsage));
+  const hcol = new Float32Array(MAXC*2*3), hsz = new Float32Array(MAXC*2);
+  for (let i=0;i<MAXC;i++){ hcol.set([1.5,1.35,1.0], i*6); hcol.set([1.6,0.08,0.04], i*6+3); hsz[i*2]=1.15; hsz[i*2+1]=0.95; }
+  hg.setAttribute('aCol', new THREE.Float32BufferAttribute(hcol,3));
+  hg.setAttribute('aSize', new THREE.Float32BufferAttribute(hsz,1));
+  hg.setAttribute('aBlink', new THREE.Float32BufferAttribute(new Float32Array(MAXC*2).fill(-1),1));
+  lightPts = new THREE.Points(hg, headMat); lightPts.frustumCulled = false;
+  cityGroup.add(carMesh, lightPts);
+  // 车辆路径
+  cars = [];
+  for (let k=-H-1; k<=H; k++){
+    for (let lane=0; lane<2; lane++){
+      const c0 = (k+0.5)*P;
+      const dir = lane?1:-1;
+      const nCars = 2+(rng()*3|0);
+      for (let i=0;i<nCars;i++){
+        const axis = rng()<0.5?0:1;
+        cars.push({ axis, dir, lanePos: c0 - dir*RW*0.24, s: (rng()*2-1)*carHalf,
+          speed: 9+rng()*9, gap: rng() });
+      }
+    }
+  }
+  // 排序交错，保证实例索引稳定即可
+  updateCarCount();
+
+  /* ---- 雨 ---- */
+  if (!rainPts){
+    const rg = new THREE.BufferGeometry();
+    const seeds = new Float32Array(RAIN_N*4);
+    for (let i=0;i<RAIN_N*4;i++) seeds[i]=Math.random();
+    rg.setAttribute('aSeed', new THREE.Float32BufferAttribute(seeds,4));
+    rg.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(RAIN_N*3),3)); // 占位
+    rainPts = new THREE.Points(rg, rainMat); rainPts.frustumCulled = false;
+    scene.add(rainPts);
+  }
+
+  // 阴影范围
+  const sc = sunLight.shadow.camera;
+  sc.left=-cityR; sc.right=cityR; sc.top=cityR; sc.bottom=-cityR; sc.near=100; sc.far=6000;
+  sc.updateProjectionMatrix();
+  scene.add(cityGroup);
+  if (toast) showToast('城市已重建 · ' + bCount + ' 栋建筑');
+}
+function updateCarCount(){
+  const n = clamp(Math.round(STATE.carCount), 0, cars.length);
+  if (carMesh){ carMesh.count = n; }
+  if (lightPts){ lightPts.geometry.setDrawRange(0, n*2); }
+}
+
+/* ================= 车流更新 ================= */
+const _up = new THREE.Vector3(0,1,0);
+function updateCars(dt, winNight){
+  if (!carMesh) return;
+  const n = carMesh.count;
+  const range = carHalf*2;
+  const lp = lightPts.geometry.attributes.position;
+  for (let i=0;i<n;i++){
+    const c = cars[i];
+    c.s += c.dir*c.speed*STATE.carSpeed*dt;
+    if (c.s > carHalf) c.s -= range; else if (c.s < -carHalf) c.s += range;
+    let x, z, rot, fx, fz;
+    if (c.axis===0){ x=c.s; z=c.lanePos; rot=c.dir>0?0:Math.PI; fx=c.dir; fz=0; }
+    else { x=c.lanePos; z=c.s; rot=c.dir>0?-Math.PI/2:Math.PI/2; fx=0; fz=c.dir; }
+    carQuat.setFromAxisAngle(_up, rot);
+    carPos.set(x,0,z);
+    carMat4.compose(carPos, carQuat, carScl);
+    carMesh.setMatrixAt(i, carMat4);
+    lp.array[i*6]=x+fx*2.25; lp.array[i*6+1]=0.9; lp.array[i*6+2]=z+fz*2.25;
+    lp.array[i*6+3]=x-fx*2.25; lp.array[i*6+4]=0.9; lp.array[i*6+5]=z-fz*2.25;
+  }
+  carMesh.instanceMatrix.needsUpdate = true;
+  lightPts.visible = winNight>0.02 && n>0;
+  if (lightPts.visible) lp.needsUpdate = true;
+}
+
+/* ================= 后期处理 ================= */
+const FinalShader = {
+  uniforms:{ tDiffuse:{value:null}, uExposure:{value:1.1}, uContrast:{value:1.05}, uSaturation:{value:1.08},
+    uTemp:{value:0.52}, uVignette:{value:0.42}, uGrain:{value:0.25}, uCA:{value:0.18}, uSharp:{value:0.3},
+    uTime:{value:0}, uRes:{value:new THREE.Vector2(1,1)} },
+  vertexShader:`varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+  fragmentShader:`
+    varying vec2 vUv;
+    uniform sampler2D tDiffuse;
+    uniform float uExposure,uContrast,uSaturation,uTemp,uVignette,uGrain,uCA,uSharp,uTime;
+    uniform vec2 uRes;
+    float hash12(vec2 p){ vec3 p3=fract(vec3(p.xyx)*0.1031); p3+=dot(p3,p3.yzx+33.33); return fract((p3.x+p3.y)*p3.z); }
+    vec3 aces(vec3 x){ return clamp((x*(2.51*x+0.03))/(x*(2.43*x+0.59)+0.14), 0.0, 1.0); }
+    void main(){
+      vec2 texel = 1.0/uRes;
+      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      // 锐化（非锐化掩模，HDR 域）
+      if (uSharp > 0.001){
+        vec3 nb = texture2D(tDiffuse, vUv+vec2(texel.x,0.0)).rgb
+                + texture2D(tDiffuse, vUv-vec2(texel.x,0.0)).rgb
+                + texture2D(tDiffuse, vUv+vec2(0.0,texel.y)).rgb
+                + texture2D(tDiffuse, vUv-vec2(0.0,texel.y)).rgb;
+        c += (c - nb*0.25)*uSharp*0.6;
+      }
+      // 白平衡（HDR 域）
+      vec3 wb = mix(vec3(0.92,0.98,1.12), vec3(1.10,0.98,0.86), uTemp);
+      // ACES 色调映射
+      c = aces(c*wb*uExposure);
+      // 径向色差（LDR 域，避免 HDR 亮点通道错位）
+      if (uCA > 0.001){
+        vec2 off = (vUv-0.5)*uCA*0.0055;
+        c.r = aces(texture2D(tDiffuse, vUv+off).rgb*wb*uExposure).r;
+        c.b = aces(texture2D(tDiffuse, vUv-off).rgb*wb*uExposure).b;
+      }
+      // 对比 / 饱和
+      c = clamp((c-0.5)*uContrast+0.5, 0.0, 1.0);
+      float luma = dot(c, vec3(0.299,0.587,0.114));
+      c = mix(vec3(luma), c, uSaturation);
+      // 暗角
+      float d = length(vUv-0.5);
+      c *= 1.0 - uVignette*smoothstep(0.32,0.82,d)*0.8;
+      // 胶片颗粒
+      float g = hash12(vUv*uRes+vec2(fract(uTime)*137.0, fract(uTime*0.7)*91.0));
+      c += (g-0.5)*uGrain*0.13*(1.0-luma*0.6);
+      // sRGB 编码
+      c = clamp(c, 0.0, 1.0);
+      c = mix(c*12.92, 1.055*pow(c, vec3(1.0/2.4))-0.055, step(0.0031308, c));
+      gl_FragColor = vec4(c, 1.0);
+    }`
+};
+const composerRT = new THREE.WebGLRenderTarget(innerWidth, innerHeight, { type: THREE.HalfFloatType });
+const composer = new EffectComposer(renderer, composerRT);
+const renderPass = new RenderPass(scene, camera);
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight), STATE.bloomS, STATE.bloomR, STATE.bloomT);
+const finalPass = new ShaderPass(FinalShader);
+const fxaaPass = new ShaderPass(FXAAShader);
+composer.addPass(renderPass); composer.addPass(bloomPass); composer.addPass(finalPass); composer.addPass(fxaaPass);
+
+/* ================= 分辨率 / 自适应 ================= */
+let adaptiveScale = 1.0;
+function computePointScale(){
+  const h = renderer.getDrawingBufferSize(new THREE.Vector2()).y;
+  const v = h*0.5/Math.tan(camera.fov*0.5*DEG);
+  for (const m of [lampGlowMat, beaconMat, headMat, rainMat]) m.uniforms.uPointScale.value = v;
+}
+function applyPixelRatio(){
+  const pr = clamp(devicePixelRatio||1, 1, 2)*STATE.prScale*adaptiveScale;
+  renderer.setPixelRatio(pr);
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setPixelRatio(pr);
+  composer.setSize(innerWidth, innerHeight);
+  fxaaPass.material.uniforms.resolution.value.set(1/(innerWidth*pr), 1/(innerHeight*pr));
+  finalPass.uniforms.uRes.value.set(innerWidth*pr, innerHeight*pr);
+  computePointScale();
+}
+function onResize(){ camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); applyPixelRatio(); }
+addEventListener('resize', onResize);
+
+/* ================= 参数分发 ================= */
+const REBUILD_KEYS = new Set(['seed','gridN','blockSize','roadW','density','maxH','falloff','hJitter',
+  'glassR','brickR','parkR','treeD','lampDens','antennaOn']);
+function setShadows(v){
+  renderer.shadowMap.enabled = v; sunLight.castShadow = v;
+  scene.traverse(o=>{ if (o.material) o.material.needsUpdate = true; });
+}
+function applyStatic(){
+  setShadows(STATE.shadowOn);
+  sunLight.shadow.mapSize.set(STATE.shadowQ, STATE.shadowQ);
+  if (sunLight.shadow.map){ sunLight.shadow.map.dispose(); sunLight.shadow.map = null; }
+  camera.fov = STATE.fov; camera.updateProjectionMatrix();
+  controls.autoRotate = STATE.autoRotate;
+  fxaaPass.enabled = STATE.fxaa;
+  document.body.classList.toggle('hudHidden', !STATE.showHud);
+  updateCarCount();
+  applyPixelRatio();
+}
+function onParam(k){
+  if (REBUILD_KEYS.has(k)) scheduleRebuild();
+  else if (k==='shadowOn') setShadows(STATE.shadowOn);
+  else if (k==='shadowQ'){ sunLight.shadow.mapSize.set(STATE.shadowQ,STATE.shadowQ);
+    if (sunLight.shadow.map){ sunLight.shadow.map.dispose(); sunLight.shadow.map = null; } }
+  else if (k==='prScale'){ adaptiveScale = 1.0; applyPixelRatio(); }
+  else if (k==='fov'){ camera.fov = STATE.fov; camera.updateProjectionMatrix(); computePointScale(); }
+  else if (k==='fxaa') fxaaPass.enabled = STATE.fxaa;
+  else if (k==='carCount') updateCarCount();
+  else if (k==='autoRotate') controls.autoRotate = STATE.autoRotate;
+  else if (k==='showHud') document.body.classList.toggle('hudHidden', !STATE.showHud);
+}
+
+/* ================= 预设 ================= */
+const PRESETS = [
+ ['破晓', {timeOfDay:5.9, cloudCov:0.42, cloudDense:0.9, fogD:0.9, rain:0, storm:false, wet:0.15, turbidity:5, windSpeed:4, bloomS:0.45, bloomT:1.25, bloomR:0.4, exposure:1.05, litRatio:0.3}],
+ ['正午', {timeOfDay:12.6, cloudCov:0.22, cloudDense:0.7, fogD:0.3, rain:0, storm:false, wet:0, turbidity:3, windSpeed:5, bloomS:0.32, bloomT:1.25, bloomR:0.35, exposure:1.1, litRatio:0.25}],
+ ['黄昏', {timeOfDay:18.15, cloudCov:0.4, cloudDense:0.9, fogD:0.6, rain:0, storm:false, wet:0.25, turbidity:5.5, windSpeed:6, bloomS:0.42, bloomT:1.25, bloomR:0.4, exposure:1.12, litRatio:0.45}],
+ ['午夜', {timeOfDay:0.1, cloudCov:0.18, cloudDense:0.7, fogD:0.4, rain:0, storm:false, wet:0.1, litRatio:0.5, starInt:1.4, windSpeed:3, bloomS:0.4, bloomT:1.25, bloomR:0.4, exposure:1.15}],
+ ['暴雨夜', {timeOfDay:21.3, cloudCov:0.95, cloudDense:1.3, fogD:1.3, rain:0.85, storm:true, wet:1, litRatio:0.55, windSpeed:14, bloomS:0.5, bloomT:1.1, bloomR:0.45, exposure:1.1}],
+ ['雾都清晨', {timeOfDay:7.3, cloudCov:0.55, cloudDense:0.9, fogD:1.4, rain:0, storm:false, wet:0.4, turbidity:12, windSpeed:2, bloomS:0.45, bloomT:1.25, exposure:1.05, litRatio:0.4}],
+ ['赛博之夜', {timeOfDay:22.4, cloudCov:0.3, cloudDense:0.8, fogD:0.5, rain:0.12, storm:false, wet:0.75, litRatio:0.6, winLight:1.7, lampInt:1.6, headInt:2.0, windSpeed:5, bloomS:0.55, bloomT:0.95, bloomR:0.45, saturation:1.45, temp:0.38, ca:0.5, grain:0.3, exposure:1.05}],
+];
+const presetsBar = document.getElementById('presets');
+PRESETS.forEach(([name, patch], idx)=>{
+  const b = document.createElement('button'); b.textContent = name;
+  b.addEventListener('click', ()=>applyPreset(name, patch));
+  presetsBar.appendChild(b);
+});
+function applyPreset(name, patch){
+  const needRebuild = Object.keys(patch).some(k=>REBUILD_KEYS.has(k));
+  Object.assign(STATE, patch);
+  refreshUI(); applyStatic();
+  if (needRebuild) rebuildCity(false);
+  showToast('预设：' + name);
+}
+let toastTimer = null;
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toastTimer); toastTimer = setTimeout(()=>t.style.display='none', 2200);
+}
+
+/* ================= 交互 ================= */
+const playBtn = document.getElementById('playBtn');
+function setPlaying(v){ STATE.playing = v; playBtn.textContent = v?'⏸':'▶'; if (guiRefs.playing) guiRefs.playing.inp.checked = v; }
+playBtn.addEventListener('click', ()=>setPlaying(!STATE.playing));
+addEventListener('keydown', (e)=>{
+  if (e.code==='Space' && e.target.tagName!=='INPUT'){ e.preventDefault(); setPlaying(!STATE.playing); }
+  else if (e.key==='g'||e.key==='G'){ STATE.showHud=!STATE.showHud; refreshUI(); onParam('showHud'); }
+  else if (e.key==='f'||e.key==='F'){ document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen(); }
+  else if (e.key>='1'&&e.key<='7'){ const p = PRESETS[+e.key-1]; if (p) applyPreset(p[0], p[1]); }
+});
+
+/* ================= 主循环 ================= */
+const clockEl = document.getElementById('clock'), phaseEl = document.getElementById('phase'), fpsEl = document.getElementById('fps');
+const PHASES = [[4.5,'深夜'],[6,'凌晨'],[8,'清晨'],[11.5,'上午'],[13.5,'正午'],[17,'下午'],[19.2,'黄昏'],[21.5,'夜晚'],[25,'深夜']];
+let lastT = performance.now(), fpsAcc = 0, fpsN = 0, fpsShow = 60, adaptAcc = 0;
+function animate(){
+  requestAnimationFrame(animate);
+  const now = performance.now();
+  let dt = Math.min((now-lastT)/1000, 0.1); lastT = now;
+  const t = now/1000;
+  // 时间推进
+  if (STATE.playing){
+    STATE.timeOfDay = (STATE.timeOfDay + dt*STATE.timeSpeed/3600)%24;
+    const r = guiRefs.timeOfDay;
+    if (r){ r.inp.value = STATE.timeOfDay; r.val.textContent = STATE.timeOfDay.toFixed(r.dec)+r.unit; }
+  }
+  computeSun();
+  const s = sunState;
+  const winNight = 1 - sstep(-0.08, 0.06, s.sinAlt);
+  // 雷暴
+  if (STATE.storm && STATE.rain>0.4){
+    s.flashT -= dt;
+    if (s.flashT<=0){ s.flash = 1; s.flashT = 2.5+Math.random()*9; }
+  }
+  s.flash *= Math.exp(-dt*5.5);
+  // 天空 uniforms
+  const su = skyUniforms;
+  su.uSunDir.value.copy(sunDir); su.uMoonDir.value.copy(moonDir);
+  su.uRayleigh.value = 2.0*STATE.rayleighS; su.uTurbidity.value = STATE.turbidity;
+  su.uCloudCov.value = STATE.cloudCov; su.uCloudDense.value = STATE.cloudDense;
+  su.uWindOff.value.x += dt*STATE.windSpeed*0.0035;
+  su.uWindOff.value.y += dt*STATE.windSpeed*0.0012;
+  su.uNight.value = s.nightF; su.uStarInt.value = STATE.starInt;
+  su.uMoonInt.value = STATE.moonInt; su.uSunDisc.value = STATE.sunDisc;
+  su.uFlash.value = s.flash; su.uTime.value = t; su.uRain.value = STATE.rain;
+  su.uFogCol.value.copy(fogColor);
+  // 建筑 / 地面 / 树木 uniforms
+  bU.uTime.value = t; bU.uNight.value = winNight;
+  bU.uWinLight.value = STATE.winLight; bU.uLitRatio.value = STATE.litRatio; bU.uWinDensity.value = STATE.winDensity;
+  bU.uHorizonCol.value.copy(fogColor); bU.uZenithCol.value.copy(zenithCol);
+  gU.uTime.value = t; gU.uNight.value = winNight; gU.uWet.value = Math.max(STATE.wet, STATE.rain*0.7);
+  gU.uRain.value = STATE.rain; gU.uLampInt.value = STATE.lampInt;
+  gU.uSkyCol.value.copy(fogColor); gU.uZenithCol.value.copy(zenithCol);
+  tU.uTime.value = t; tU.uWind.value = STATE.windSpeed;
+  // 光点
+  lampGlowMat.uniforms.uInt.value = STATE.lampInt*winNight*1.15;
+  lampGlowMat.uniforms.uTime.value = t;
+  beaconMat.uniforms.uInt.value = (0.35+0.65*s.nightF)*1.0;
+  beaconMat.uniforms.uTime.value = t;
+  headMat.uniforms.uInt.value = STATE.headInt*winNight;
+  headMat.uniforms.uTime.value = t;
+  rainMat.uniforms.uTime.value = t; rainMat.uniforms.uCam.value.copy(camera.position);
+  rainMat.uniforms.uRain.value = STATE.rain; rainMat.uniforms.uWind.value = STATE.windSpeed;
+  if (rainPts) rainPts.visible = STATE.rain>0.01;
+  // 车辆
+  if (carMesh && carMesh.material.userData.shader) carMesh.material.userData.shader.uniforms.uHead.value = STATE.headInt;
+  updateCars(dt, winNight);
+  // 后期
+  bloomPass.strength = STATE.bloomS; bloomPass.threshold = STATE.bloomT; bloomPass.radius = STATE.bloomR;
+  const fu = finalPass.uniforms;
+  fu.uExposure.value = STATE.exposure; fu.uContrast.value = STATE.contrast;
+  fu.uSaturation.value = STATE.saturation; fu.uTemp.value = STATE.temp;
+  fu.uVignette.value = STATE.vignette; fu.uGrain.value = STATE.grain;
+  fu.uCA.value = STATE.ca; fu.uSharp.value = STATE.sharp; fu.uTime.value = t;
+  // 相机
+  controls.autoRotateSpeed = STATE.rotSpeed;
+  controls.target.x = clamp(controls.target.x, -cityExt*0.7, cityExt*0.7);
+  controls.target.z = clamp(controls.target.z, -cityExt*0.7, cityExt*0.7);
+  controls.target.y = clamp(controls.target.y, 0, 600);
+  controls.update();
+  composer.render();
+  // HUD
+  const th = STATE.timeOfDay, hh = th|0, mm = ((th-hh)*60)|0;
+  clockEl.textContent = String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0');
+  for (const [lim, name] of PHASES){ if (th<lim){ phaseEl.textContent = name; break; } }
+  // FPS / 自适应
+  fpsAcc += dt; fpsN++;
+  if (fpsAcc >= 0.5){
+    fpsShow = Math.round(fpsN/fpsAcc); fpsAcc = 0; fpsN = 0;
+    const info = renderer.info.render;
+    fpsEl.textContent = `FPS ${fpsShow} · ${info.calls} calls · ${(info.triangles/1e6).toFixed(1)}M△`;
+    if (STATE.adaptive){
+      if (fpsShow < 42 && adaptiveScale > 0.55){ adaptiveScale = Math.max(0.55, adaptiveScale-0.1); applyPixelRatio(); }
+      else if (fpsShow > 57 && adaptiveScale < 1){ adaptiveScale = Math.min(1, adaptiveScale+0.05); applyPixelRatio(); }
+    }
+  }
+}
+
+/* ================= 启动 ================= */
+buildGUI();
+refreshUI();
+rebuildCity(false);
+applyStatic();
+onResize();
+setPlaying(true);
+animate();
+</script>
+</body>
+</html>

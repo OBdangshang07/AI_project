@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>宏大都市实时渲染器 Pro</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:#000;font-family:'Segoe UI',system-ui,sans-serif}
+#app{width:100vw;height:100vh}
+canvas{display:block}
+#ui{position:fixed;top:0;right:0;width:310px;height:100vh;background:rgba(8,10,16,0.93);
+  overflow-y:auto;color:#bbc8dd;padding:10px;font-size:11px;z-index:100;
+  border-left:1px solid rgba(70,110,220,0.25);scrollbar-width:thin;scrollbar-color:#2a3a5a #0a0e18;
+  transition:transform .3s ease}
+#ui.hidden{transform:translateX(100%)}
+#ui::-webkit-scrollbar{width:5px}
+#ui::-webkit-scrollbar-thumb{background:#2a3a5a;border-radius:3px}
+.sec{margin-bottom:6px;border:1px solid rgba(60,90,180,0.2);border-radius:5px;overflow:hidden}
+.sec-h{background:linear-gradient(90deg,rgba(30,50,100,0.5),rgba(20,35,70,0.3));padding:7px 10px;
+  cursor:pointer;font-weight:600;font-size:11px;color:#7ab4ff;display:flex;
+  justify-content:space-between;align-items:center;user-select:none}
+.sec-h:hover{background:rgba(40,65,130,0.5)}
+.sec-h::after{content:'▸';transition:transform .2s;font-size:10px}
+.sec.open .sec-h::after{transform:rotate(90deg)}
+.sec-b{padding:5px 8px;display:none;background:rgba(5,8,15,0.4)}
+.sec.open .sec-b{display:block}
+.ctl{margin:4px 0;display:flex;align-items:center;gap:5px}
+.ctl label{flex:0 0 95px;font-size:10px;color:#8899bb}
+.ctl input[type=range]{flex:1;height:3px;-webkit-appearance:none;background:#1a2540;border-radius:2px;outline:none}
+.ctl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:10px;border-radius:50%;background:#4a8fff;cursor:pointer;box-shadow:0 0 4px rgba(74,143,255,0.5)}
+.ctl .v{flex:0 0 32px;text-align:right;font-size:9px;color:#5588cc;font-family:monospace}
+.ctl select{flex:1;background:#111828;color:#99aacc;border:1px solid #2a3a5a;border-radius:3px;padding:2px;font-size:10px}
+#hud{position:fixed;top:8px;left:8px;color:rgba(160,190,255,0.85);font-size:11px;pointer-events:none;text-shadow:0 1px 3px rgba(0,0,0,0.8)}
+#fps{color:rgba(80,255,140,0.9)}
+#btn-ui{position:fixed;top:8px;right:318px;z-index:101;background:rgba(15,25,50,0.85);color:#7ab4ff;
+  border:1px solid rgba(70,110,220,0.35);border-radius:4px;padding:5px 10px;cursor:pointer;font-size:11px}
+#btn-ui:hover{background:rgba(30,50,100,0.85)}
+.btn-row{padding:6px 8px;text-align:center;display:flex;gap:4px;flex-wrap:wrap}
+.btn-row button{background:#152040;color:#7ab4ff;border:1px solid #3a5a9a;padding:4px 10px;border-radius:3px;cursor:pointer;font-size:10px}
+.btn-row button:hover{background:#203060}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="hud">宏大都市渲染器 Pro | 左键旋转 · 滚轮缩放 · 右键平移<br><span id="fps"></span></div>
+<button id="btn-ui">☰ 控制面板</button>
+<div id="ui"></div>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {Sky} from 'three/addons/objects/Sky.js';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+import {ShaderPass} from 'three/addons/postprocessing/ShaderPass.js';
+import {FXAAShader} from 'three/addons/shaders/FXAAShader.js';
+
+// ==================== 参数系统 (55项) ====================
+const P = {
+  // 城市形态 (1-12)
+  buildingDensity: 0.88, heightScale: 1.0, maxHeight: 60, minHeight: 6,
+  blockSize: 28, streetWidth: 12, cityRadius: 5, widthVariation: 0.6,
+  rooftopDetail: 0.7, landmarkFreq: 0.04, podiumChance: 0.45, taperChance: 0.3,
+  // 时间天气 (13-24)
+  timeOfDay: 0.32, timeSpeed: 1.0, autoTime: true, cloudCover: 0.25,
+  fogDensity: 0.0008, fogColor: 0.6, hazeAmount: 0.3, rainIntensity: 0.0,
+  starBrightness: 1.0, moonSize: 1.0, windSpeed: 1.0, humidity: 0.4,
+  // 光照 (25-36)
+  sunIntensity: 3.0, ambientLevel: 0.4, shadowRes: 2048, shadowBias: -0.0003,
+  exposure: 0.9, skyTurbidity: 4.0, sunAzimuth: 0.25, groundReflect: 0.15,
+  specStrength: 1.0, emissiveGlow: 2.0, nightLightColor: 0.7, aoStrength: 0.6,
+  // 后期效果 (37-48)
+  bloomStrength: 0.4, bloomRadius: 0.6, bloomThreshold: 0.85, toneMapping: 4,
+  vignetteAmount: 0.25, saturation: 1.05, contrast: 1.02, colorTemp: 0.0,
+  fxaa: true, dofAmount: 0.0, motionBlur: 0.0, lensFlareAmt: 0.0,
+  // 交通 (49-55)
+  trafficDensity: 0.8, vehicleSpeed: 1.0, headlightRange: 15, taillightGlow: 1.5,
+  vehicleVariety: 0.7, trafficLightCycle: 8.0, elevatedTraffic: 0.6
+};
+
+// ==================== 渲染器初始化 ====================
+const renderer = new THREE.WebGLRenderer({antialias:false, powerPreference:'high-performance'});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = P.exposure;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+document.getElementById('app').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth/window.innerHeight, 0.5, 2000);
+camera.position.set(80, 55, 100);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 12, 0);
+controls.enableDamping = true;
+controls.dampingFactor = 0.06;
+controls.maxPolarAngle = Math.PI * 0.48;
+controls.minDistance = 15;
+controls.maxDistance = 400;
+controls.update();
+
+// ==================== 程序化纹理图集生成 ====================
+const ATLAS_SIZE = 2048, ATLAS_CELLS = 8, CELL_SIZE = ATLAS_SIZE / ATLAS_CELLS;
+
+function createTextureAtlas() {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = ATLAS_SIZE;
+  const ctx = cv.getContext('2d');
+  const rng = mulberry32(42);
+  
+  for (let row = 0; row < ATLAS_CELLS; row++) {
+    for (let col = 0; col < ATLAS_CELLS; col++) {
+      const x0 = col * CELL_SIZE, y0 = row * CELL_SIZE;
+      const type = (row * ATLAS_CELLS + col) % 10;
+      generateFacadeTexture(ctx, x0, y0, CELL_SIZE, type, rng);
+    }
+  }
+  const tex = new THREE.CanvasTexture(cv);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}}
+
+function generateFacadeTexture(ctx, x, y, size, type, rng) {
+  const s = size;
+  const hue = rng() * 360, sat = 10 + rng() * 25, lit = 35 + rng() * 30;
+  ctx.save();
+  ctx.beginPath(); ctx.rect(x, y, s, s); ctx.clip();
+  
+  switch(type) {
+    case 0: drawBrickFacade(ctx, x, y, s, rng); break;
+    case 1: drawGlassCurtain(ctx, x, y, s, rng); break;
+    case 2: drawConcreteFacade(ctx, x, y, s, rng); break;
+    case 3: drawMetalPanel(ctx, x, y, s, rng); break;
+    case 4: drawStoneFacade(ctx, x, y, s, rng); break;
+    case 5: drawTileFacade(ctx, x, y, s, rng); break;
+    case 6: drawGlassCurtain(ctx, x, y, s, rng); break; // 变体
+    case 7: drawConcreteFacade(ctx, x, y, s, rng); break;
+    case 8: drawBrickFacade(ctx, x, y, s, rng); break;
+    case 9: drawMetalPanel(ctx, x, y, s, rng); break;
+  }
+  // 添加通用细节：污渍、裂缝
+  addWeathering(ctx, x, y, s, rng);
+  ctx.restore();
+}
+
+function drawBrickFacade(ctx, x, y, s, rng) {
+  const baseH = 15 + rng() * 20, baseS = 40 + rng() * 30, baseL = 30 + rng() * 20;
+  ctx.fillStyle = `hsl(${baseH},${baseS}%,${baseL}%)`;
+  ctx.fillRect(x, y, s, s);
+  const bw = s / (6 + Math.floor(rng() * 4)), bh = bw * 0.4;
+  const mortarW = bw * 0.08;
+  for (let row = 0; row * bh < s; row++) {
+    const offset = (row % 2) * bw * 0.5;
+    for (let col = -1; col * bw < s + bw; col++) {
+      const bx = x + col * bw + offset + mortarW;
+      const by = y + row * bh + mortarW;
+      const bVar = (rng() - 0.5) * 12;
+      ctx.fillStyle = `hsl(${baseH + bVar},${baseS + bVar * 0.5}%,${baseL + bVar}%)`;
+      ctx.fillRect(bx, by, bw - mortarW * 2, bh - mortarW * 2);
+      // 砖面微凹凸
+      if (rng() > 0.7) {
+        ctx.fillStyle = `rgba(0,0,0,${0.03 + rng() * 0.05})`;
+        ctx.fillRect(bx + rng() * bw * 0.3, by, bw * 0.4, bh - mortarW * 2);
+      }
+    }
+  }
+  // 灰浆线
+  ctx.strokeStyle = `hsl(${baseH},10%,${baseL + 20}%)`;
+  ctx.lineWidth = mortarW;
+  for (let row = 0; row * bh <= s; row++) {
+    ctx.beginPath(); ctx.moveTo(x, y + row * bh); ctx.lineTo(x + s, y + row * bh); ctx.stroke();
+  }
+  // 窗户
+  addWindows(ctx, x, y, s, rng, 3 + Math.floor(rng() * 3), 4 + Math.floor(rng() * 5));
+}
+
+function drawGlassCurtain(ctx, x, y, s, rng) {
+  const baseHue = 190 + rng() * 40;
+  ctx.fillStyle = `hsl(${baseHue},30%,${18 + rng() * 12}%)`;
+  ctx.fillRect(x, y, s, s);
+  const cols = 4 + Math.floor(rng() * 4), rows = 6 + Math.floor(rng() * 6);
+  const cw = s / cols, ch = s / rows;
+  const mullion = cw * 0.06;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const gx = x + c * cw + mullion, gy = y + r * ch + mullion;
+      const gw = cw - mullion * 2, gh = ch - mullion * 2;
+      // 玻璃反射渐变
+      const grad = ctx.createLinearGradient(gx, gy, gx + gw, gy + gh);
+      const l1 = 20 + rng() * 25, l2 = 30 + rng() * 30;
+      grad.addColorStop(0, `hsl(${baseHue + rng() * 20},${35 + rng() * 20}%,${l1}%)`);
+      grad.addColorStop(0.5, `hsl(${baseHue},${25 + rng() * 15}%,${l2}%)`);
+      grad.addColorStop(1, `hsl(${baseHue - 10},${30 + rng() * 15}%,${l1 + 5}%)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(gx, gy, gw, gh);
+      // 高光反射条
+      if (rng() > 0.5) {
+        ctx.fillStyle = `rgba(200,220,255,${0.05 + rng() * 0.1})`;
+        ctx.fillRect(gx + gw * 0.1, gy, gw * 0.15, gh);
+      }
+    }
+  }
+  // 铝合金框架
+  ctx.strokeStyle = `hsl(210,5%,${40 + rng() * 20}%)`;
+  ctx.lineWidth = mullion * 1.5;
+  for (let c = 0; c <= cols; c++) { ctx.beginPath(); ctx.moveTo(x + c * cw, y); ctx.lineTo(x + c * cw, y + s); ctx.stroke(); }
+  for (let r = 0; r <= rows; r++) { ctx.beginPath(); ctx.moveTo(x, y + r * ch); ctx.lineTo(x + s, y + r * ch); ctx.stroke(); }
+}
+
+function drawConcreteFacade(ctx, x, y, s, rng) {
+  const lit = 45 + rng() * 25;
+  ctx.fillStyle = `hsl(${30 + rng() * 20},${5 + rng() * 10}%,${lit}%)`;
+  ctx.fillRect(x, y, s, s);
+  // 混凝土噪点
+  for (let i = 0; i < 800; i++) {
+    const px = x + rng() * s, py = y + rng() * s;
+    ctx.fillStyle = `rgba(${rng() > 0.5 ? '0,0,0' : '255,255,255'},${0.02 + rng() * 0.04})`;
+    ctx.fillRect(px, py, 1 + rng() * 3, 1 + rng() * 3);
+  }
+  // 模板接缝
+  ctx.strokeStyle = `rgba(0,0,0,0.15)`;
+  ctx.lineWidth = 1.5;
+  const panels = 2 + Math.floor(rng() * 2);
+  for (let i = 1; i < panels; i++) {
+    ctx.beginPath(); ctx.moveTo(x, y + i * s / panels); ctx.lineTo(x + s, y + i * s / panels); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x + i * s / panels, y); ctx.lineTo(x + i * s / panels, y + s); ctx.stroke();
+  }
+  addWindows(ctx, x, y, s, rng, 3 + Math.floor(rng() * 3), 4 + Math.floor(rng() * 4));
+}
+
+function drawMetalPanel(ctx, x, y, s, rng) {
+  const baseHue = 200 + rng() * 30, baseLit = 35 + rng() * 20;
+  ctx.fillStyle = `hsl(${baseHue},${8 + rng() * 12}%,${baseLit}%)`;
+  ctx.fillRect(x, y, s, s);
+  const panelH = s / (8 + Math.floor(rng() * 8));
+  for (let r = 0; r * panelH < s; r++) {
+    const py = y + r * panelH;
+    const grad = ctx.createLinearGradient(x, py, x, py + panelH);
+    grad.addColorStop(0, `hsl(${baseHue},10%,${baseLit + 8}%)`);
+    grad.addColorStop(0.5, `hsl(${baseHue},10%,${baseLit}%)`);
+    grad.addColorStop(1, `hsl(${baseHue},10%,${baseLit - 5}%)`);
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, py + 1, s, panelH - 2);
+    // 铆钉
+    ctx.fillStyle = `rgba(180,190,200,0.4)`;
+    for (let rx = 0; rx < 5; rx++) {
+      ctx.beginPath(); ctx.arc(x + s * 0.1 + rx * s * 0.2, py + panelH * 0.5, 1.5, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+  // 竖向肋条
+  ctx.strokeStyle = `rgba(0,0,0,0.1)`;
+  for (let c = 0; c < 6; c++) {
+    ctx.beginPath(); ctx.moveTo(x + c * s / 6, y); ctx.lineTo(x + c * s / 6, y + s); ctx.stroke();
+  }
+  addWindows(ctx, x, y, s, rng, 2 + Math.floor(rng() * 2), 5 + Math.floor(rng() * 4));
+}
+
+function drawStoneFacade(ctx, x, y, s, rng) {
+  const baseHue = 30 + rng() * 30, baseLit = 40 + rng() * 25;
+  ctx.fillStyle = `hsl(${baseHue},${15 + rng() * 15}%,${baseLit}%)`;
+  ctx.fillRect(x, y, s, s);
+  const stoneH = s / (5 + Math.floor(rng() * 4));
+  for (let r = 0; r * stoneH < s; r++) {
+    let sx = x;
+    while (sx < x + s) {
+      const sw = s * (0.2 + rng() * 0.4);
+      const sv = (rng() - 0.5) * 10;
+      ctx.fillStyle = `hsl(${baseHue + sv},${15 + rng() * 10}%,${baseLit + sv}%)`;
+      ctx.fillRect(sx + 1.5, y + r * stoneH + 1.5, sw - 3, stoneH - 3);
+      // 石材纹理
+      ctx.strokeStyle = `rgba(0,0,0,0.05)`;
+      ctx.beginPath();
+      ctx.moveTo(sx + rng() * sw, y + r * stoneH);
+      ctx.lineTo(sx + rng() * sw, y + (r + 1) * stoneH);
+      ctx.stroke();
+      sx += sw;
+    }
+  }
+  addWindows(ctx, x, y, s, rng, 2 + Math.floor(rng() * 3), 3 + Math.floor(rng() * 4));
+}
+
+function drawTileFacade(ctx, x, y, s, rng) {
+  const baseHue = rng() * 360, baseLit = 55 + rng() * 25;
+  ctx.fillStyle = `hsl(${baseHue},${15 + rng() * 20}%,${baseLit}%)`;
+  ctx.fillRect(x, y, s, s);
+  const tileS = s / (10 + Math.floor(rng() * 10));
+  for (let r = 0; r * tileS < s; r++) {
+    for (let c = 0; c * tileS < s; c++) {
+      const tv = (rng() - 0.5) * 8;
+      ctx.fillStyle = `hsl(${baseHue + tv},${15 + rng() * 15}%,${baseLit + tv}%)`;
+      ctx.fillRect(x + c * tileS + 0.8, y + r * tileS + 0.8, tileS - 1.6, tileS - 1.6);
+    }
+  }
+  addWindows(ctx, x, y, s, rng, 3 + Math.floor(rng() * 2), 4 + Math.floor(rng() * 4));
+}
+
+function addWindows(ctx, x, y, s, rng, cols, rows) {
+  const margin = s * 0.08;
+  const areaW = s - margin * 2, areaH = s - margin * 2;
+  const ww = areaW / cols * 0.65, wh = areaH / rows * 0.55;
+  const gapX = areaW / cols, gapY = areaH / rows;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const wx = x + margin + c * gapX + (gapX - ww) / 2;
+      const wy = y + margin + r * gapY + (gapY - wh) / 2;
+      // 窗框
+      ctx.fillStyle = `hsl(210,5%,${25 + rng() * 15}%)`;
+      ctx.fillRect(wx - 2, wy - 2, ww + 4, wh + 4);
+      // 玻璃
+      const grad = ctx.createLinearGradient(wx, wy, wx + ww, wy + wh);
+      const gl = 15 + rng() * 30;
+      grad.addColorStop(0, `hsl(${200 + rng() * 30},${20 + rng() * 20}%,${gl}%)`);
+      grad.addColorStop(1, `hsl(${210 + rng() * 20},${15 + rng() * 15}%,${gl + 10}%)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(wx, wy, ww, wh);
+      // 窗台
+      ctx.fillStyle = `rgba(60,60,60,0.5)`;
+      ctx.fillRect(wx - 3, wy + wh, ww + 6, 3);
+    }
+  }
+}
+
+function addWeathering(ctx, x, y, s, rng) {
+  // 底部污渍
+  const grad = ctx.createLinearGradient(x, y + s, x, y + s * 0.6);
+  grad.addColorStop(0, `rgba(20,15,10,${0.1 + rng() * 0.15})`);
+  grad.addColorStop(1, 'rgba(20,15,10,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(x, y + s * 0.6, s, s * 0.4);
+  // 随机水渍
+  for (let i = 0; i < 3; i++) {
+    if (rng() > 0.5) continue;
+    const sx = x + rng() * s, sy = y + rng() * s * 0.3;
+    const sg = ctx.createLinearGradient(sx, sy, sx, sy + s * 0.4);
+    sg.addColorStop(0, `rgba(30,25,20,${0.05 + rng() * 0.08})`);
+    sg.addColorStop(1, 'rgba(30,25,20,0)');
+    ctx.fillStyle = sg;
+    ctx.fillRect(sx - 3, sy, 6 + rng() * 8, s * 0.4);
+  }
+}
+
+// ==================== 建筑生成系统 ====================
+const buildingGroup = new THREE.Group();
+scene.add(buildingGroup);
+let atlasTexture, buildingMeshes = [], instanceUVData = [];
+
+function createBuildingMaterial() {
+  atlasTexture = createTextureAtlas();
+  const mat = new THREE.MeshStandardMaterial({
+    map: atlasTexture, roughness: 0.7, metalness: 0.1,
+  });
+  // 注入实例化UV偏移
+  mat.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>
+        attribute vec4 aUvRegion;`)
+      .replace('#include <uv_vertex>', `#include <uv_vertex>
+        vMapUv = vec2(aUvRegion.x + uv.x * aUvRegion.z, aUvRegion.y + uv.y * aUvRegion.w);`);
+  };
+  return mat;
+}
+
+function generateCity() {
+  // 清除旧建筑
+  buildingMeshes.forEach(m => { buildingGroup.remove(m); m.geometry.dispose(); });
+  buildingMeshes = [];
+  
+  const mat = createBuildingMaterial();
+  const block = P.blockSize + P.streetWidth;
+  const half = P.cityRadius;
+  const rng = mulberry32(Date.now() % 10000);
+  
+  // 收集所有实例数据
+  const instances = []; // {x, z, w, d, h, type, uvIdx}
+  
+  for (let gx = -half; gx <= half; gx++) {
+    for (let gz = -half; gz <= half; gz++) {
+      const cx = gx * block, cz = gz * block;
+      const dist = Math.hypot(cx, cz) / (half * block);
+      if (dist > 1.05) continue;
+      if (rng() > P.buildingDensity) continue;
+      
+      // 每地块可放1-2栋建筑
+      const numBuildings = rng() > 0.7 ? 2 : 1;
+      for (let bi = 0; bi < numBuildings; bi++) {
+        const centerFactor = 1.0 - dist * 0.6;
+        let h = (P.minHeight + rng() * P.maxHeight * centerFactor) * P.heightScale;
+        if (rng() < P.landmarkFreq && dist < 0.4) h *= 1.8 + rng();
+        h = Math.max(h, P.minHeight);
+        
+        const maxW = P.blockSize * (numBuildings > 1 ? 0.45 : 0.85);
+        const w = maxW * (0.5 + rng() * P.widthVariation * 0.5);
+        const d = maxW * (0.5 + rng() * P.widthVariation * 0.5);
+        const ox = numBuildings > 1 ? (bi === 0 ? -maxW * 0.3 : maxW * 0.3) : (rng() - 0.5) * P.blockSize * 0.2;
+        const oz = numBuildings > 1 ? (rng() - 0.5) * maxW * 0.4 : (rng() - 0.5) * P.blockSize * 0.2;
+        
+        const type = Math.floor(rng() * 6);
+        const uvIdx = Math.floor(rng() * ATLAS_CELLS * ATLAS_CELLS);
+        instances.push({ x: cx + ox, z: cz + oz, w, d, h, type, uvIdx });
+        
+        // 裙楼
+        if (rng() < P.podiumChance && h > P.maxHeight * 0.4) {
+          instances.push({ x: cx + ox, z: cz + oz, w: w * 1.5, d: d * 1.5, h: h * 0.15, type: 2, uvIdx: Math.floor(rng() * 64) });
+        }
+      }
+    }
+  }
+  
+  // 按建筑类型分组创建InstancedMesh
+  const typeGeos = createBuildingGeometries();
+  const typeInstances = [[], [], [], [], [], []];
+  instances.forEach(inst => typeInstances[inst.type % 6].push(inst));
+  
+  const dummy = new THREE.Object3D();
+  const cellW = 1.0 / ATLAS_CELLS;
+  
+  typeInstances.forEach((insts, ti) => {
+    if (insts.length === 0) return;
+    const geo = typeGeos[ti].clone();
+    const mesh = new THREE.InstancedMesh(geo, mat, insts.length);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    
+    const uvAttr = new Float32Array(insts.length * 4);
+    
+    insts.forEach((inst, i) => {
+      dummy.position.set(inst.x, inst.h / 2, inst.z);
+      dummy.scale.set(inst.w, inst.h, inst.d);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+      
+      const col = inst.uvIdx % ATLAS_CELLS, row = Math.floor(inst.uvIdx / ATLAS_CELLS);
+      uvAttr[i * 4] = col * cellW;
+      uvAttr[i * 4 + 1] = row * cellW;
+      uvAttr[i * 4 + 2] = cellW * 0.95;
+      uvAttr[i * 4 + 3] = cellW * 0.95;
+    });
+    
+    geo.setAttribute('aUvRegion', new THREE.InstancedBufferAttribute(uvAttr, 4));
+    mesh.instanceMatrix.needsUpdate = true;
+    buildingGroup.add(mesh);
+    buildingMeshes.push(mesh);
+  });
+  
+  // 屋顶装饰
+  addRooftopDetails(instances, rng);
+}
+
+function createBuildingGeometries() {
+  return [
+    new THREE.BoxGeometry(1, 1, 1),                    // 标准方楼
+    createTaperedGeometry(0.7),                         // 锥形塔楼
+    new THREE.BoxGeometry(1, 1, 1),                    // 板楼(宽扁)
+    createCylinderGeometry(12),                         // 圆柱塔
+    new THREE.BoxGeometry(1, 1, 1),                    // 厂房(宽矮)
+    createSteppedGeometry(),                            // 阶梯式
+  ];
+}
+
+function createTaperedGeometry(ratio) {
+  // 四棱锥形塔楼，底部宽顶部窄
+  const geo = new THREE.CylinderGeometry(ratio * 0.42, 0.5, 1, 4, 4);
+  geo.rotateY(Math.PI / 4);
+  return geo;
+}
+
+function createCylinderGeometry(segments) {
+  return new THREE.CylinderGeometry(0.5, 0.5, 1, segments, 1);
+}
+
+function createSteppedGeometry() {
+  // 阶梯式建筑 - 使用合并几何体
+  const geo = new THREE.BoxGeometry(1, 1, 1);
+  return geo;
+}
+
+function addRooftopDetails(instances, rng) {
+  // 天线
+  const antennaGeo = new THREE.CylinderGeometry(0.08, 0.15, 1, 4);
+  const antennaMat = new THREE.MeshStandardMaterial({color: 0x444444, metalness: 0.8, roughness: 0.3});
+  const tallInsts = instances.filter(i => i.h > P.maxHeight * 0.5 && rng() < P.rooftopDetail * 0.4);
+  if (tallInsts.length > 0) {
+    const mesh = new THREE.InstancedMesh(antennaGeo, antennaMat, tallInsts.length);
+    const dummy = new THREE.Object3D();
+    tallInsts.forEach((inst, i) => {
+      const ah = inst.h * (0.1 + rng() * 0.15);
+      dummy.position.set(inst.x, inst.h + ah / 2, inst.z);
+      dummy.scale.set(1, ah, 1);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+    buildingGroup.add(mesh);
+    buildingMeshes.push(mesh);
+  }
+  // 屋顶设备箱
+  const boxGeo = new THREE.BoxGeometry(1, 1, 1);
+  const boxMat = new THREE.MeshStandardMaterial({color: 0x556666, roughness: 0.8});
+  const equipInsts = instances.filter(i => i.h > P.minHeight * 2 && rng() < P.rooftopDetail * 0.5);
+  if (equipInsts.length > 0) {
+    const mesh = new THREE.InstancedMesh(boxGeo, boxMat, Math.min(equipInsts.length, 500));
+    const dummy = new THREE.Object3D();
+    const count = Math.min(equipInsts.length, 500);
+    for (let i = 0; i < count; i++) {
+      const inst = equipInsts[i];
+      const ew = inst.w * (0.15 + rng() * 0.2), ed = inst.d * (0.15 + rng() * 0.2), eh = 1 + rng() * 2;
+      dummy.position.set(inst.x + (rng() - 0.5) * inst.w * 0.4, inst.h + eh / 2, inst.z + (rng() - 0.5) * inst.d * 0.4);
+      dummy.scale.set(ew, eh, ed);
+      dummy.updateMatrix();
+      mesh.setMatrixAt(i, dummy.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+    buildingGroup.add(mesh);
+    buildingMeshes.push(mesh);
+  }
+}
+
+// ==================== 道路系统 ====================
+const roadGroup = new THREE.Group();
+scene.add(roadGroup);
+
+function createRoads() {
+  while(roadGroup.children.length) roadGroup.remove(roadGroup.children[0]);
+  
+  const block = P.blockSize + P.streetWidth;
+  const half = P.cityRadius;
+  const extent = (half + 1) * block;
+  
+  // 路面纹理
+  const roadTex = createRoadTexture();
+  const roadMat = new THREE.MeshStandardMaterial({map: roadTex, roughness: 0.85, metalness: 0.0});
+  
+  // 横向道路
+  for (let gz = -half - 1; gz <= half + 1; gz++) {
+    const z = gz * block;
+    const geo = new THREE.PlaneGeometry(extent * 2, P.streetWidth);
+    geo.rotateX(-Math.PI / 2);
+    const mesh = new THREE.Mesh(geo, roadMat);
+    mesh.position.set(0, 0.02, z);
+    mesh.receiveShadow = true;
+    roadGroup.add(mesh);
+  }
+  // 纵向道路
+  for (let gx = -half - 1; gx <= half + 1; gx++) {
+    const x = gx * block;
+    const geo = new THREE.PlaneGeometry(P.streetWidth, extent * 2);
+    geo.rotateX(-Math.PI / 2);
+    const mesh = new THREE.Mesh(geo, roadMat);
+    mesh.position.set(x, 0.03, 0);
+    mesh.receiveShadow = true;
+    roadGroup.add(mesh);
+  }
+  
+  // 人行道
+  const sidewalkMat = new THREE.MeshStandardMaterial({color: 0x888880, roughness: 0.9});
+  for (let gx = -half; gx <= half; gx++) {
+    for (let gz = -half; gz <= half; gz++) {
+      const x = gx * block, z = gz * block;
+      if (Math.hypot(x, z) > extent) continue;
+      const geo = new THREE.BoxGeometry(P.blockSize + 2, 0.25, P.blockSize + 2);
+      const mesh = new THREE.Mesh(geo, sidewalkMat);
+      mesh.position.set(x, 0.12, z);
+      mesh.receiveShadow = true;
+      roadGroup.add(mesh);
+    }
+  }
+  
+  // 路灯
+  createStreetLights(block, half, extent);
+  // 高架桥
+  createElevatedRoad(block, half);
+}
+
+function createRoadTexture() {
+  const cv = document.createElement('canvas');
+  cv.width = 256; cv.height = 256;
+  const ctx = cv.getContext('2d');
+  // 沥青底色
+  ctx.fillStyle = '#2a2a2e';
+  ctx.fillRect(0, 0, 256, 256);
+  // 噪点
+  for (let i = 0; i < 2000; i++) {
+    const v = Math.random() * 20;
+    ctx.fillStyle = `rgba(${v > 10 ? 255 : 0},${v > 10 ? 255 : 0},${v > 10 ? 255 : 0},0.02)`;
+    ctx.fillRect(Math.random() * 256, Math.random() * 256, 2, 2);
+  }
+  // 中央虚线
+  ctx.strokeStyle = '#cccc44';
+  ctx.lineWidth = 3;
+  ctx.setLineDash([20, 15]);
+  ctx.beginPath(); ctx.moveTo(128, 0); ctx.lineTo(128, 256); ctx.stroke();
+  // 边线
+  ctx.setLineDash([]);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2.5;
+  ctx.beginPath(); ctx.moveTo(15, 0); ctx.lineTo(15, 256); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(241, 0); ctx.lineTo(241, 256); ctx.stroke();
+  // 车道虚线
+  ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([15, 20]);
+  ctx.beginPath(); ctx.moveTo(70, 0); ctx.lineTo(70, 256); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(186, 0); ctx.lineTo(186, 256); ctx.stroke();
+  
+  const tex = new THREE.CanvasTexture(cv);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(1, 8);
+  return tex;
+}
+
+function createStreetLights(block, half, extent) {
+  const poleMat = new THREE.MeshStandardMaterial({color: 0x333333, metalness: 0.7, roughness: 0.4});
+  const lampMat = new THREE.MeshStandardMaterial({color: 0xffffee, emissive: 0xffeeaa, emissiveIntensity: 0.5});
+  const poleGeo = new THREE.CylinderGeometry(0.12, 0.18, 7, 6);
+  const armGeo = new THREE.CylinderGeometry(0.06, 0.06, 2.5, 4);
+  const lampGeo = new THREE.SphereGeometry(0.35, 8, 6);
+  
+  const positions = [];
+  for (let gx = -half; gx <= half; gx++) {
+    for (let gz = -half; gz <= half; gz++) {
+      const x = gx * block + P.blockSize / 2 + P.streetWidth / 2;
+      const z = gz * block + P.blockSize / 2 + P.streetWidth / 2;
+      if (Math.hypot(x, z) < extent && Math.random() < 0.6) positions.push([x, z]);
+    }
+  }
+  
+  const count = Math.min(positions.length, 400);
+  const poleMesh = new THREE.InstancedMesh(poleGeo, poleMat, count);
+  const lampMesh = new THREE.InstancedMesh(lampGeo, lampMat, count);
+  const dummy = new THREE.Object3D();
+  
+  for (let i = 0; i < count; i++) {
+    const [x, z] = positions[i];
+    dummy.position.set(x, 3.5, z);
+    dummy.scale.set(1, 1, 1);
+    dummy.updateMatrix();
+    poleMesh.setMatrixAt(i, dummy.matrix);
+    dummy.position.set(x, 7.2, z);
+    dummy.updateMatrix();
+    lampMesh.setMatrixAt(i, dummy.matrix);
+  }
+  poleMesh.instanceMatrix.needsUpdate = true;
+  lampMesh.instanceMatrix.needsUpdate = true;
+  roadGroup.add(poleMesh, lampMesh);
+  roadGroup.userData.lampMesh = lampMesh;
+}
+
+function createElevatedRoad(block, half) {
+  const extent = half * block;
+  const roadMat = new THREE.MeshStandardMaterial({color: 0x3a3a3e, roughness: 0.8});
+  const pillarMat = new THREE.MeshStandardMaterial({color: 0x666660, roughness: 0.7});
+  
+  // 一条横向高架
+  const deckGeo = new THREE.BoxGeometry(extent * 2, 0.8, 10);
+  const deck = new THREE.Mesh(deckGeo, roadMat);
+  deck.position.set(0, 9, block * 1.5);
+  deck.castShadow = true;
+  deck.receiveShadow = true;
+  roadGroup.add(deck);
+  
+  // 护栏
+  const railGeo = new THREE.BoxGeometry(extent * 2, 1.0, 0.2);
+  const railMat = new THREE.MeshStandardMaterial({color: 0x555555, metalness: 0.5});
+  [-5, 5].forEach(offset => {
+    const rail = new THREE.Mesh(railGeo, railMat);
+    rail.position.set(0, 9.9, block * 1.5 + offset);
+    roadGroup.add(rail);
+  });
+  
+  // 桥墩
+  const pillarGeo = new THREE.CylinderGeometry(0.6, 0.8, 9, 8);
+  const pillarCount = Math.floor(extent * 2 / 20);
+  const pillarMesh = new THREE.InstancedMesh(pillarGeo, pillarMat, pillarCount);
+  const dummy = new THREE.Object3D();
+  for (let i = 0; i < pillarCount; i++) {
+    dummy.position.set(-extent + i * 20, 4.5, block * 1.5);
+    dummy.updateMatrix();
+    pillarMesh.setMatrixAt(i, dummy.matrix);
+  }
+  pillarMesh.instanceMatrix.needsUpdate = true;
+  roadGroup.add(pillarMesh);
+}
+
+// ==================== 车辆系统 ====================
+const vehicleGroup = new THREE.Group();
+scene.add(vehicleGroup);
+let vehicles = [];
+
+function createVehicles() {
+  while(vehicleGroup.children.length) vehicleGroup.remove(vehicleGroup.children[0]);
+  vehicles = [];
+  
+  const block = P.blockSize + P.streetWidth;
+  const half = P.cityRadius;
+  const extent = half * block;
+  const count = Math.floor(200 * P.trafficDensity);
+  
+  // 车身几何
+  const bodyGeo = new THREE.BoxGeometry(1, 0.6, 2.2);
+  const cabinGeo = new THREE.BoxGeometry(0.85, 0.45, 1.2);
+  const wheelGeo = new THREE.CylinderGeometry(0.22, 0.22, 0.15, 8);
+  
+  const bodyColors = [0xcc2222, 0x2255cc, 0x222222, 0xeeeeee, 0x44aa44, 0xdddd22, 0x8844aa, 0xdd6600, 0x22aaaa, 0x666666];
+  
+  for (let i = 0; i < count; i++) {
+    const isHorizontal = Math.random() > 0.5;
+    const lane = Math.floor(Math.random() * (half * 2 + 1)) - half;
+    const laneOffset = (Math.random() > 0.5 ? 1 : -1) * (1.5 + Math.random() * 2);
+    const pos = (Math.random() - 0.5) * extent * 2;
+    const speed = (8 + Math.random() * 15) * P.vehicleSpeed;
+    const dir = laneOffset > 0 ? 1 : -1;
+    
+    const color = bodyColors[Math.floor(Math.random() * bodyColors.length)];
+    const bodyMat = new THREE.MeshStandardMaterial({color, roughness: 0.3, metalness: 0.6});
+    
+    const car = new THREE.Group();
+    // 车身
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = 0.45;
+    body.castShadow = true;
+    car.add(body);
+    // 车窗
+    const cabinMat = new THREE.MeshStandardMaterial({color: 0x112233, roughness: 0.1, metalness: 0.3, transparent: true, opacity: 0.7});
+    const cabin = new THREE.Mesh(cabinGeo, cabinMat);
+    cabin.position.set(0, 0.85, -0.1);
+    car.add(cabin);
+    // 车轮
+    const wheelMat = new THREE.MeshStandardMaterial({color: 0x111111, roughness: 0.9});
+    [[-0.45, -0.7], [0.45, -0.7], [-0.45, 0.7], [0.45, 0.7]].forEach(([wx, wz]) => {
+      const wheel = new THREE.Mesh(wheelGeo, wheelMat);
+      wheel.rotation.z = Math.PI / 2;
+      wheel.position.set(wx, 0.22, wz);
+      car.add(wheel);
+    });
+    // 车灯
+    const headlightMat = new THREE.MeshStandardMaterial({color: 0xffffff, emissive: 0xffffcc, emissiveIntensity: 1.0});
+    const taillightMat = new THREE.MeshStandardMaterial({color: 0xff0000, emissive: 0xff2200, emissiveIntensity: 0.8});
+    const lightGeo = new THREE.BoxGeometry(0.2, 0.12, 0.05);
+    [[-0.35, 1.1], [0.35, 1.1]].forEach(([lx, lz]) => {
+      const hl = new THREE.Mesh(lightGeo, headlightMat);
+      hl.position.set(lx, 0.45, lz);
+      car.add(hl);
+    });
+    [[-0.35, -1.1], [0.35, -1.1]].forEach(([lx, lz]) => {
+      const tl = new THREE.Mesh(lightGeo, taillightMat);
+      tl.position.set(lx, 0.45, lz);
+      car.add(tl);
+    });
+    
+    // 定位
+    if (isHorizontal) {
+      car.position.set(pos, 0.05, lane * block + laneOffset);
+      car.rotation.y = dir > 0 ? Math.PI / 2 : -Math.PI / 2;
+    } else {
+      car.position.set(lane * block + laneOffset, 0.05, pos);
+      car.rotation.y = dir > 0 ? 0 : Math.PI;
+    }
+    
+    vehicleGroup.add(car);
+    vehicles.push({ mesh: car, isHorizontal, speed: speed * dir, extent });
+  }
+}
+
+function updateVehicles(dt) {
+  vehicles.forEach(v => {
+    if (v.isHorizontal) {
+      v.mesh.position.x += v.speed * dt;
+      if (v.mesh.position.x > v.extent) v.mesh.position.x = -v.extent;
+      if (v.mesh.position.x < -v.extent) v.mesh.position.x = v.extent;
+    } else {
+      v.mesh.position.z += v.speed * dt;
+      if (v.mesh.position.z > v.extent) v.mesh.position.z = -v.extent;
+      if (v.mesh.position.z < -v.extent) v.mesh.position.z = v.extent;
+    }
+  });
+}
+
+// ==================== 天空与光照 ====================
+const sky = new Sky();
+sky.scale.setScalar(10000);
+scene.add(sky);
+
+const sunLight = new THREE.DirectionalLight(0xffffff, P.sunIntensity);
+sunLight.castShadow = true;
+sunLight.shadow.mapSize.set(P.shadowRes, P.shadowRes);
+sunLight.shadow.camera.near = 1;
+sunLight.shadow.camera.far = 500;
+const shadowExtent = (P.cityRadius + 1) * (P.blockSize + P.streetWidth);
+sunLight.shadow.camera.left = -shadowExtent;
+sunLight.shadow.camera.right = shadowExtent;
+sunLight.shadow.camera.top = shadowExtent;
+sunLight.shadow.camera.bottom = -shadowExtent;
+sunLight.shadow.bias = P.shadowBias;
+sunLight.shadow.normalBias = 0.05;
+scene.add(sunLight);
+scene.add(sunLight.target);
+
+const ambientLight = new THREE.HemisphereLight(0x8899cc, 0x445533, P.ambientLevel);
+scene.add(ambientLight);
+
+const sunPosition = new THREE.Vector3();
+const skyUniforms = sky.material.uniforms;
+skyUniforms['turbidity'].value = P.skyTurbidity;
+skyUniforms['rayleigh'].value = 2.0;
+skyUniforms['mieCoefficient'].value = 0.005;
+skyUniforms['mieDirectionalG'].value = 0.8;
+
+function updateSunPosition() {
+  const t = P.timeOfDay;
+  // 太阳角度: 0=午夜, 0.25=日出, 0.5=正午, 0.75=日落
+  const elevation = Math.sin((t - 0.25) * Math.PI * 2) * 70;
+  const azimuth = (t * 360 + P.sunAzimuth * 180) % 360;
+  
+  const phi = THREE.MathUtils.degToRad(90 - elevation);
+  const theta = THREE.MathUtils.degToRad(azimuth);
+  sunPosition.setFromSphericalCoords(1, phi, theta);
+  
+  skyUniforms['sunPosition'].value.copy(sunPosition);
+  
+  sunLight.position.copy(sunPosition).multiplyScalar(200);
+  sunLight.target.position.set(0, 0, 0);
+  
+  // 根据太阳高度调整光照
+  const sunHeight = sunPosition.y;
+  const dayFactor = THREE.MathUtils.smoothstep(sunHeight, -0.05, 0.15);
+  
+  sunLight.intensity = P.sunIntensity * dayFactor;
+  sunLight.color.setHSL(0.1 - (1 - dayFactor) * 0.05, 0.6 + (1 - dayFactor) * 0.3, 0.5 + dayFactor * 0.4);
+  
+  ambientLight.intensity = P.ambientLevel * (0.15 + dayFactor * 0.85);
+  ambientLight.color.setHSL(0.6, 0.3, 0.3 + dayFactor * 0.4);
+  ambientLight.groundColor.setHSL(0.1, 0.2, 0.1 + dayFactor * 0.2);
+  
+  // 雾
+  const fogColor = new THREE.Color().setHSL(0.6 - dayFactor * 0.1, 0.2 + dayFactor * 0.2, 0.1 + dayFactor * 0.5);
+  scene.fog = new THREE.FogExp2(fogColor, P.fogDensity * (1 + (1 - dayFactor) * 0.5));
+  
+  // 夜间窗户发光
+  updateNightLights(1 - dayFactor);
+  
+  return dayFactor;
+}
+
+let nightFactor = 0;
+function updateNightLights(nf) {
+  nightFactor = nf;
+  // 路灯发光强度
+  const lampMesh = roadGroup.userData.lampMesh;
+  if (lampMesh) {
+    lampMesh.material.emissiveIntensity = nf * P.emissiveGlow;
+  }
+  // 车灯
+  vehicles.forEach(v => {
+    v.mesh.children.forEach(child => {
+      if (child.material && child.material.emissive) {
+        child.material.emissiveIntensity = 0.3 + nf * P.taillightGlow;
+      }
+    });
+  });
+}
+
+// ==================== 后期处理 ====================
+const composer = new EffectComposer(renderer);
+const renderPass = new RenderPass(scene, camera);
+composer.addPass(renderPass);
+
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  P.bloomStrength, P.bloomRadius, P.bloomThreshold
+);
+composer.addPass(bloomPass);
+
+const fxaaPass = new ShaderPass(FXAAShader);
+fxaaPass.uniforms['resolution'].value.set(1 / window.innerWidth, 1 / window.innerHeight);
+composer.addPass(fxaaPass);
+
+// 自定义色调/暗角着色器
+const colorGradeShader = {
+  uniforms: {
+    tDiffuse: {value: null},
+    uVignette: {value: P.vignetteAmount},
+    uSaturation: {value: P.saturation},
+    uContrast: {value: P.contrast},
+    uColorTemp: {value: P.colorTemp}
+  },
+  vertexShader: `varying vec2 vUv; void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);}`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uVignette, uSaturation, uContrast, uColorTemp;
+    varying vec2 vUv;
+    void main(){
+      vec4 col = texture2D(tDiffuse, vUv);
+      // 色温
+      col.r += uColorTemp * 0.03;
+      col.b -= uColorTemp * 0.03;
+      // 饱和度
+      float lum = dot(col.rgb, vec3(0.2126, 0.7152, 0.0722));
+      col.rgb = mix(vec3(lum), col.rgb, uSaturation);
+      // 对比度
+      col.rgb = (col.rgb - 0.5) * uContrast + 0.5;
+      // 暗角
+      vec2 d = vUv - 0.5;
+      col.rgb *= 1.0 - uVignette * dot(d, d) * 2.0;
+      gl_FragColor = col;
+    }`
+};
+const colorGradePass = new ShaderPass(colorGradeShader);
+composer.addPass(colorGradePass);
+
+// ==================== 地面 ====================
+const groundGeo = new THREE.PlaneGeometry(1200, 1200);
+groundGeo.rotateX(-Math.PI / 2);
+const groundMat = new THREE.MeshStandardMaterial({color: 0x2a3a2a, roughness: 0.95});
+const ground = new THREE.Mesh(groundGeo, groundMat);
+ground.position.y = -0.1;
+ground.receiveShadow = true;
+scene.add(ground);
+
+// ==================== UI 系统 ====================
+function buildUI() {
+  const ui = document.getElementById('ui');
+  const sections = [
+    {name:'🏙️ 城市形态', items:[
+      ['buildingDensity','建筑密度',0.3,1,0.01],['heightScale','高度缩放',0.3,2.5,0.05],
+      ['maxHeight','最大高度',20,120,1],['minHeight','最小高度',3,15,0.5],
+      ['blockSize','街区尺寸',15,50,1],['streetWidth','道路宽度',6,25,0.5],
+      ['cityRadius','城市半径',3,9,1],['widthVariation','宽度变化',0,1,0.05],
+      ['rooftopDetail','屋顶细节',0,1,0.05],['landmarkFreq','地标频率',0,0.15,0.005],
+      ['podiumChance','裙楼概率',0,1,0.05],['taperChance','锥形概率',0,1,0.05]
+    ]},
+    {name:'🌅 时间天气', items:[
+      ['timeOfDay','时刻(0-1)',0,1,0.002],['timeSpeed','时间流速',0,5,0.1],
+      ['autoTime','自动时间',0,1,1],['cloudCover','云量',0,1,0.02],
+      ['fogDensity','雾浓度',0,0.005,0.0001],['hazeAmount','霾量',0,1,0.02],
+      ['rainIntensity','雨量',0,1,0.02],['starBrightness','星光',0,2,0.05],
+      ['moonSize','月亮大小',0.5,2,0.1],['windSpeed','风速',0,3,0.1],
+      ['humidity','湿度',0,1,0.02],['skyTurbidity','天空浊度',1,10,0.1]
+    ]},
+    {name:'☀️ 光照渲染', items:[
+      ['sunIntensity','太阳强度',0.5,6,0.1],['ambientLevel','环境光',0.05,1,0.02],
+      ['shadowBias','阴影偏移',-0.002,0,0.0001],['exposure','曝光',0.3,2,0.02],
+      ['sunAzimuth','太阳方位',0,1,0.01],['groundReflect','地面反射',0,0.5,0.01],
+      ['specStrength','高光强度',0,2,0.05],['emissiveGlow','发光强度',0,4,0.1],
+      ['nightLightColor','夜灯色相',0,1,0.01],['aoStrength','AO强度',0,1,0.02]
+    ]},
+    {name:'✨ 后期特效', items:[
+      ['bloomStrength','泛光强度',0,2,0.02],['bloomRadius','泛光半径',0,2,0.02],
+      ['bloomThreshold','泛光阈值',0.3,1.5,0.02],['vignetteAmount','暗角',0,0.8,0.02],
+      ['saturation','饱和度',0.5,1.8,0.02],['contrast','对比度',0.7,1.5,0.02],
+      ['colorTemp','色温偏移',-1,1,0.02],['dofAmount','景深',0,2,0.05],
+      ['motionBlur','运动模糊',0,1,0.02],['lensFlareAmt','镜头光晕',0,1,0.02]
+    ]},
+    {name:'🚗 交通系统', items:[
+      ['trafficDensity','车流密度',0.1,1.5,0.05],['vehicleSpeed','车速倍率',0.2,3,0.1],
+      ['headlightRange','车头灯距',5,30,1],['taillightGlow','尾灯亮度',0,3,0.1],
+      ['vehicleVariety','车辆多样性',0,1,0.05],['trafficLightCycle','信号灯周期',3,15,0.5],
+      ['elevatedTraffic','高架车流',0,1,0.05]
+    ]}
+  ];
+  
+  let html = '';
+  sections.forEach((sec, si) => {
+    html += `<div class="sec${si === 0 ? ' open' : ''}"><div class="sec-h">${sec.name}</div><div class="sec-b">`;
+    sec.items.forEach(([key, label, min, max, step]) => {
+      const val = P[key];
+      if (key === 'autoTime' || key === 'fxaa') {
+        html += `<div class="ctl"><label>${label}</label><input type="checkbox" data-key="${key}" ${val ? 'checked' : ''}></div>`;
+      } else {
+        const display = step >= 1 ? val : (step >= 0.01 ? val.toFixed(2) : val.toFixed(4));
+        html += `<div class="ctl"><label>${label}</label><input type="range" min="${min}" max="${max}" step="${step}" value="${val}" data-key="${key}"><span class="v">${display}</span></div>`;
+      }
+    });
+    html += '</div></div>';
+  });
+  html += `<div class="btn-row">
+    <button id="btn-regen">🔄 重建城市</button>
+    <button id="btn-roads">🛣️ 重建道路</button>
+    <button id="btn-cars">🚗 重建车流</button>
+    <button id="btn-rand">🎲 随机</button>
+  </div>`;
+  ui.innerHTML = html;
+  
+  // 事件
+  ui.querySelectorAll('input[type=range]').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const k = inp.dataset.key;
+      P[k] = parseFloat(inp.value);
+      const step = parseFloat(inp.step);
+      inp.nextElementSibling.textContent = step >= 1 ? inp.value : (step >= 0.01 ? P[k].toFixed(2) : P[k].toFixed(4));
+      applyParam(k);
+    });
+  });
+  ui.querySelectorAll('input[type=checkbox]').forEach(inp => {
+    inp.addEventListener('change', () => { P[inp.dataset.key] = inp.checked; });
+  });
+  ui.querySelectorAll('.sec-h').forEach(h => h.addEventListener('click', () => h.parentElement.classList.toggle('open')));
+  
+  document.getElementById('btn-regen').onclick = () => generateCity();
+  document.getElementById('btn-roads').onclick = () => createRoads();
+  document.getElementById('btn-cars').onclick = () => createVehicles();
+  document.getElementById('btn-rand').onclick = randomize;
+}
+
+function applyParam(k) {
+  if (k === 'bloomStrength') bloomPass.strength = P.bloomStrength;
+  if (k === 'bloomRadius') bloomPass.radius = P.bloomRadius;
+  if (k === 'bloomThreshold') bloomPass.threshold = P.bloomThreshold;
+  if (k === 'exposure') renderer.toneMappingExposure = P.exposure;
+  if (k === 'vignetteAmount') colorGradePass.uniforms.uVignette.value = P.vignetteAmount;
+  if (k === 'saturation') colorGradePass.uniforms.uSaturation.value = P.saturation;
+  if (k === 'contrast') colorGradePass.uniforms.uContrast.value = P.contrast;
+  if (k === 'colorTemp') colorGradePass.uniforms.uColorTemp.value = P.colorTemp;
+  if (k === 'skyTurbidity') skyUniforms['turbidity'].value = P.skyTurbidity;
+}
+
+function randomize() {
+  document.querySelectorAll('#ui input[type=range]').forEach(inp => {
+    const k = inp.dataset.key;
+    if (['timeOfDay', 'timeSpeed'].includes(k)) return;
+    const v = parseFloat(inp.min) + Math.random() * (parseFloat(inp.max) - parseFloat(inp.min));
+    inp.value = v; P[k] = v;
+    const step = parseFloat(inp.step);
+    inp.nextElementSibling.textContent = step >= 1 ? Math.round(v) : v.toFixed(2);
+  });
+  generateCity(); createRoads(); createVehicles();
+}
+
+document.getElementById('btn-ui').onclick = () => document.getElementById('ui').classList.toggle('hidden');
+
+// ==================== 动画循环 ====================
+let lastT = performance.now(), frameCount = 0, fpsAccum = 0;
+
+function animate(now) {
+  requestAnimationFrame(animate);
+  const dt = Math.min((now - lastT) / 1000, 0.05);
+  lastT = now;
+  
+  // FPS
+  frameCount++; fpsAccum += dt;
+  if (fpsAccum >= 1) {
+    document.getElementById('fps').textContent = `FPS: ${frameCount} | 建筑实例: ${buildingMeshes.reduce((a, m) => a + (m.count || 0), 0)} | 车辆: ${vehicles.length}`;
+    frameCount = 0; fpsAccum = 0;
+  }
+  
+  // 时间推进
+  if (P.autoTime) {
+    P.timeOfDay = (P.timeOfDay + dt * P.timeSpeed * 0.008) % 1.0;
+    const slider = document.querySelector('[data-key="timeOfDay"]');
+    if (slider) { slider.value = P.timeOfDay; slider.nextElementSibling.textContent = P.timeOfDay.toFixed(3); }
+  }
+  
+  // 更新太阳和光照
+  updateSunPosition();
+  
+  // 更新车辆
+  updateVehicles(dt);
+  
+  // 控制器
+  controls.update();
+  
+  // 渲染
+  composer.render();
+}
+
+// ==================== 窗口缩放 ====================
+window.addEventListener('resize', () => {
+  const w = window.innerWidth, h = window.innerHeight;
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  renderer.setSize(w, h);
+  composer.setSize(w, h);
+  fxaaPass.uniforms['resolution'].value.set(1 / w, 1 / h);
+});
+
+// ==================== 启动 ====================
+buildUI();
+generateCity();
+createRoads();
+createVehicles();
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>

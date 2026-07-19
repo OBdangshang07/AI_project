@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#050811">
+<title>天际引擎 · 程序化无尽都市</title>
+<style>
+  :root{color-scheme:dark;--ink:#edf4ff;--muted:#8290aa;--line:#ffffff17;--glass:#080c16d9;--accent:#58d7ff;--accent2:#a67cff}
+  *{box-sizing:border-box}html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#02040a;color:var(--ink);font:12px/1.4 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+  #gl{position:fixed;inset:0;width:100%;height:100%;display:block;background:radial-gradient(circle at 50% 35%,#182139,#02040a 70%);touch-action:none}
+  #grain{position:fixed;inset:0;pointer-events:none;opacity:.035;mix-blend-mode:screen;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.7'/%3E%3C/svg%3E")}
+  .top{position:fixed;left:18px;right:18px;top:16px;height:42px;display:flex;align-items:center;gap:9px;pointer-events:none;z-index:3}
+  .brand{height:42px;padding:0 15px;display:flex;align-items:center;gap:11px;background:#070b13b8;border:1px solid var(--line);border-radius:12px;backdrop-filter:blur(18px);box-shadow:0 12px 35px #0008;letter-spacing:.14em;font-weight:700}.brand i{width:9px;height:9px;border-radius:50%;background:var(--accent);box-shadow:0 0 18px var(--accent)}
+  .chip{height:30px;padding:0 10px;display:flex;align-items:center;background:#070b13a6;border:1px solid var(--line);border-radius:9px;color:#b9c6da;backdrop-filter:blur(14px);font-variant-numeric:tabular-nums}
+  .spacer{flex:1}.iconBtn,.top button{pointer-events:auto;border:1px solid var(--line);color:var(--ink);background:#080d17bf;border-radius:10px;height:36px;min-width:36px;padding:0 11px;cursor:pointer;backdrop-filter:blur(14px);transition:.2s}.iconBtn:hover,.top button:hover{border-color:#58d7ff66;background:#101827}.iconBtn:active,.top button:active{transform:scale(.96)}
+  #panel{position:fixed;z-index:4;right:16px;top:70px;bottom:16px;width:min(370px,calc(100vw - 32px));display:flex;flex-direction:column;background:var(--glass);border:1px solid var(--line);border-radius:16px;box-shadow:0 24px 80px #000a;backdrop-filter:blur(24px) saturate(1.2);overflow:hidden;transition:transform .32s cubic-bezier(.2,.8,.2,1),opacity .2s}
+  #panel.hidden{transform:translateX(calc(100% + 28px));opacity:0;pointer-events:none}
+  .panelHead{padding:15px;border-bottom:1px solid var(--line);display:grid;grid-template-columns:1fr auto;gap:8px}.panelTitle{font-size:15px;font-weight:700;letter-spacing:.08em}.panelSub{grid-column:1/-1;color:var(--muted)}
+  .search{grid-column:1/-1;width:100%;height:34px;border-radius:9px;border:1px solid var(--line);background:#ffffff08;color:var(--ink);padding:0 11px;outline:0}.search:focus{border-color:#58d7ff66}
+  .tabs{display:flex;gap:5px;padding:9px 10px;border-bottom:1px solid var(--line);overflow:auto;scrollbar-width:none}.tabs button{flex:none;border:0;border-radius:8px;padding:7px 9px;color:var(--muted);background:transparent;cursor:pointer}.tabs button.active{color:white;background:#58d7ff19;box-shadow:inset 0 0 0 1px #58d7ff35}
+  #controls{padding:6px 10px 110px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#ffffff24 transparent}.section{margin-top:8px;border:1px solid var(--line);border-radius:11px;overflow:hidden;background:#ffffff03}.section>summary{list-style:none;display:flex;align-items:center;gap:8px;padding:10px 11px;cursor:pointer;font-weight:650;letter-spacing:.04em}.section>summary::-webkit-details-marker{display:none}.section>summary:after{content:'＋';margin-left:auto;color:var(--muted)}.section[open]>summary:after{content:'−'}.sectionCount{color:var(--muted);font-weight:400;font-size:10px}
+  .rows{padding:2px 10px 8px}.control{display:grid;grid-template-columns:118px 1fr 50px;align-items:center;gap:8px;min-height:35px;border-top:1px solid #ffffff0b}.control label{color:#bac6d8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.control output{text-align:right;color:#dce8f8;font:10px ui-monospace,SFMono-Regular,Consolas,monospace}.control input[type=range]{appearance:none;width:100%;height:3px;background:#ffffff1d;border-radius:9px;outline:none}.control input[type=range]::-webkit-slider-thumb{appearance:none;width:12px;height:12px;border-radius:50%;background:#dff8ff;border:2px solid var(--accent);box-shadow:0 0 10px #58d7ff80;cursor:ew-resize}.control input[type=checkbox]{appearance:none;width:30px;height:17px;border-radius:9px;background:#ffffff18;position:relative;cursor:pointer}.control input[type=checkbox]:after{content:'';position:absolute;width:11px;height:11px;left:3px;top:3px;border-radius:50%;background:#94a0b2;transition:.2s}.control input[type=checkbox]:checked{background:#58d7ff55}.control input[type=checkbox]:checked:after{left:16px;background:white}.control select{width:100%;height:25px;border:1px solid var(--line);background:#101620;color:var(--ink);border-radius:6px;outline:0}.control.color input{width:100%;height:24px;border:0;background:0;padding:0}.control.hiddenRow{display:none}
+  .panelFoot{position:absolute;left:0;right:0;bottom:0;padding:10px;background:linear-gradient(transparent,#080c16 20%);display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding-top:30px}.panelFoot button{height:32px;border:1px solid var(--line);border-radius:8px;background:#ffffff08;color:#cbd7e8;cursor:pointer}.panelFoot button:hover{background:#58d7ff14;border-color:#58d7ff55}
+  #reticle{position:fixed;z-index:2;left:50%;top:50%;width:10px;height:10px;margin:-5px;opacity:.4;pointer-events:none}#reticle:before,#reticle:after{content:'';position:absolute;background:#d7f6ff;box-shadow:0 0 5px #5ad9ff}#reticle:before{left:4px;top:0;width:1px;height:10px}#reticle:after{left:0;top:4px;width:10px;height:1px}
+  #hint{position:fixed;z-index:2;left:18px;bottom:18px;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:#070b13a8;color:#95a3b9;backdrop-filter:blur(12px);transition:opacity .4s}kbd{display:inline-grid;place-items:center;min-width:20px;height:19px;padding:0 4px;border:1px solid #ffffff28;border-bottom-color:#ffffff50;border-radius:4px;background:#ffffff0d;color:#dce7f7;font:10px inherit}
+  #toast{position:fixed;z-index:10;left:50%;bottom:26px;transform:translate(-50%,20px);padding:10px 14px;border:1px solid #58d7ff50;background:#07101ddd;border-radius:10px;opacity:0;pointer-events:none;transition:.25s;backdrop-filter:blur(16px)}#toast.show{opacity:1;transform:translate(-50%,0)}
+  #loading{position:fixed;z-index:20;inset:0;display:grid;place-items:center;background:#03050b;transition:opacity .5s}.loader{text-align:center;letter-spacing:.16em;color:#cfefff}.loader b{display:block;width:42px;height:42px;margin:0 auto 16px;border-radius:50%;border:2px solid #58d7ff25;border-top-color:#58d7ff;animation:spin 1s linear infinite}@keyframes spin{to{transform:rotate(1turn)}}
+  @media(max-width:700px){.brand span{display:none}.chip{display:none}#hint{font-size:10px;max-width:calc(100vw - 80px)}#panel{top:62px;right:8px;bottom:8px;width:calc(100vw - 16px)}.top{top:10px;left:10px;right:10px}}
+</style>
+</head>
+<body>
+<canvas id="gl" aria-label="实时程序化无尽都市"></canvas><div id="grain"></div><div id="reticle"></div>
+<div class="top"><div class="brand"><i></i><span>天际引擎 / SKYLINE ENGINE</span></div><div class="chip" id="clock">--:--</div><div class="chip" id="weatherChip">晴朗</div><div class="chip" id="perf">-- FPS</div><div class="spacer"></div><button id="photo" title="保存画面">摄影</button><button id="full" class="iconBtn" title="全屏">⛶</button><button id="toggle" class="iconBtn" title="参数面板">☰</button></div>
+<aside id="panel"><div class="panelHead"><div class="panelTitle">城市生成控制台</div><div id="paramCount" class="chip">0 项</div><div class="panelSub">所有参数实时生效 · 双击参数名恢复默认</div><input id="search" class="search" placeholder="搜索参数 / Search…"></div><nav id="tabs" class="tabs"></nav><div id="controls"></div><div class="panelFoot"><button id="presetDay">昼景</button><button id="presetNight">夜景</button><button id="presetStorm">风暴</button><button id="randomize">灵感</button><button id="reset">重置</button><button id="export">导出</button><button id="import">导入</button><button id="help">帮助</button></div></aside>
+<div id="hint"><kbd>WASD</kbd> 移动　<kbd>Q/E</kbd> 升降　拖拽环顾　<kbd>Shift</kbd> 加速　<kbd>H</kbd> 隐藏界面</div><div id="toast"></div><div id="loading"><div class="loader"><b></b>正在构筑无尽都市</div></div>
+<input id="fileInput" type="file" accept="application/json" hidden>
+<script>
+(()=>{'use strict';
+const canvas=document.querySelector('#gl'), panel=document.querySelector('#panel'), toastEl=document.querySelector('#toast');
+const gl=canvas.getContext('webgl2',{antialias:false,alpha:false,depth:false,stencil:false,powerPreference:'high-performance',preserveDrawingBuffer:true});
+if(!gl){document.querySelector('#loading').innerHTML='<div class="loader">此浏览器或显卡不支持 WebGL 2</div>';return}
+
+// Every declaration below is an independent live feature. `shader:true` values occupy the packed GPU parameter array.
+const groups=[
+ {id:'city',name:'城市形态',items:[
+  ['seed','城市种子',0,999,1,137],['blockSize','街区尺度',30,100,1,58],['roadWidth','道路宽度',5,28,.1,13],['avenueEvery','主干道间隔',2,10,1,5],['avenueWidth','主干道加宽',0,18,.1,8],['lotSize','地块尺度',7,22,.1,12],['density','建筑密度',0,1,.01,.88],['coverage','建筑覆盖率',.35,.95,.01,.72],['minHeight','最低楼高',3,35,.5,8],['maxHeight','最高楼高',30,240,1,125],['heightCurve','高度分布',.35,3,.01,1.45],['downtownBoost','中心增高',0,2.5,.01,1.1],['downtownRadius','中心半径',120,1400,5,620],['districtScale','分区尺度',60,600,2,240],['districtMix','分区差异',0,1,.01,.58],['towerChance','摩天楼概率',0,1,.01,.28],['setback','塔楼退台',0,.8,.01,.46],['roundness','建筑圆角',0,2,.02,.16],['parkRate','公园比例',0,.35,.01,.07],['plazaRate','广场比例',0,.3,.01,.04],['riverWidth','河流宽度',0,100,1,34],['riverBend','河道蜿蜒',0,80,1,32],['roofDetail','屋顶设备',0,1,.01,.72],['spireChance','尖塔概率',0,1,.01,.18],['antennaHeight','天线高度',0,30,.5,12],['facadeHue','立面色相',0,1,.01,.57],['facadeVar','立面变化',0,1,.01,.72],['windowWidth','窗格宽度',1,8,.1,3.2],['floorHeight','楼层高度',2,7,.1,3.4],['windowLit','亮窗比例',0,1,.01,.58],['neonAmount','霓虹密度',0,1,.01,.32],['trafficDensity','车流密度',0,1,.01,.55],['vehicleSpeed','车流速度',0,4,.05,1.25]
+ ]},
+ {id:'sky',name:'时间与天空',items:[
+  ['timeOfDay','当地时间',0,24,.01,18.35],['timeSpeed','时间流速',0,240,.1,2,{shader:false}],['pauseTime','暂停时间',0,1,1,0,{type:'check',shader:false}],['dayOfYear','日期序号',1,365,1,172],['latitude','地理纬度',-66,66,.1,31.2],['northOffset','城市朝向',-180,180,1,0],['sunIntensity','太阳强度',0,8,.01,3.8],['sunSize','太阳视直径',.15,3,.01,.55],['moonIntensity','月光强度',0,2,.01,.35],['moonPhase','月相',0,1,.01,.78],['starIntensity','星空强度',0,3,.01,1.15],['milkyWay','银河强度',0,2,.01,.45],['rayleigh','瑞利散射',0,3,.01,1.12],['mie','米氏散射',0,3,.01,.72],['mieG','米氏方向性',.1,.98,.01,.78],['ozone','臭氧吸收',0,2,.01,.55],['skyBrightness','天空亮度',.1,3,.01,1],['horizonGlow','地平线辉光',0,3,.01,1.05],['nightAmbient','夜间环境光',0,1,.01,.12]
+ ]},
+ {id:'weather',name:'天气系统',items:[
+  ['cloudCoverage','云量',0,1,.01,.32],['cloudDensity','云层密度',0,2,.01,.82],['cloudScale','云团尺度',.2,3,.01,1],['cloudHeight','云底高度',100,900,5,420],['cloudThickness','云层厚度',20,500,5,180],['cloudSpeed','云速',0,4,.01,.65],['windDirection','风向',0,360,1,25],['haze','霾浓度',0,1,.01,.17],['fogDensity','雾密度',0,.02,.0001,.0018],['fogHeight','雾层高度',5,250,1,65],['rain','降雨量',0,1,.01,0],['rainLength','雨丝长度',.2,3,.01,1.25],['snow','降雪量',0,1,.01,0],['wetness','地面湿润',0,1,.01,.18],['puddle','积水比例',0,1,.01,.22],['storm','风暴强度',0,1,.01,0],['lightningRate','闪电频率',0,1,.01,.12],['temperatureWeather','天气冷暖',-1,1,.01,.05]
+ ]},
+ {id:'light',name:'光照与材质',items:[
+  ['ambient','环境光',0,3,.01,.78],['sunDiffuse','日光漫反射',0,3,.01,1.18],['shadowStrength','阴影强度',0,1,.01,.68],['shadowSoftness','阴影柔度',.2,6,.01,2.1],['aoStrength','环境遮蔽',0,2,.01,.78],['specular','镜面反射',0,2,.01,.56],['roughness','整体粗糙度',0,1,.01,.62],['metalness','金属立面',0,1,.01,.12],['glassAmount','玻璃幕墙',0,1,.01,.42],['emissive','灯光亮度',0,5,.01,1.35],['neonBrightness','霓虹亮度',0,6,.01,2.1],['roadBrightness','道路亮度',.1,2,.01,.62],['streetLights','路灯密度',0,1,.01,.72],['headlights','车灯强度',0,5,.01,1.55],['reflection','反射强度',0,2,.01,.72],['waterReflect','水面反射',0,2,.01,1.1],['normalDetail','材质微表面',0,2,.01,.75],['volumetric','体积光',0,2,.01,.42],['lightPollution','城市光污染',0,2,.01,.48]
+ ]},
+ {id:'post',name:'镜头与后期',items:[
+  ['exposure','曝光',.15,3,.01,1.05],['toneMap','色调映射',0,2,1,0,{type:'select',options:['ACES 电影','Reinhard','Uncharted']}],['contrast','对比度',.5,2,.01,1.08],['saturation','饱和度',0,2,.01,1.03],['gamma','伽马',.5,2,.01,1],['temperature','色温',-1,1,.01,.08],['tint','色调偏移',-1,1,.01,0],['bloom','辉光',0,3,.01,.72],['bloomThreshold','辉光阈值',0,4,.01,1.05],['bloomRadius','辉光半径',0,3,.01,1.15],['glare','镜头眩光',0,2,.01,.42],['anamorphic','横向耀斑',0,2,.01,.28],['vignette','暗角',0,1,.01,.32],['grain','胶片颗粒',0,.3,.001,.035],['chromatic','色差',0,2,.01,.18],['sharpen','锐化',0,2,.01,.38],['dof','景深',0,2,.01,.08],['focusDistance','焦点距离',5,700,1,170],['aperture','光圈',0,3,.01,.5],['motionBlur','运动模糊',0,1,.01,0],['lensDirt','镜头尘斑',0,1,.01,.08],['tealOrange','青橙分级',0,1,.01,.12],['fade','褪色',0,1,.01,.02],['barrel','镜头畸变',-.4,.4,.001,.02],['pixelate','像素化',0,8,1,0],['scanlines','扫描线',0,1,.01,0]
+ ]},
+ {id:'camera',name:'相机与性能',items:[
+  ['fov','视野角度',30,105,1,68,{shader:false}],['cameraSpeed','飞行速度',5,240,1,42,{shader:false}],['sprintMultiplier','加速倍率',1,8,.1,3,{shader:false}],['mouseSensitivity','环顾灵敏度',.05,1,.01,.22,{shader:false}],['autoFly','自动巡航',0,1,1,1,{type:'check',shader:false}],['autoFlySpeed','巡航速度',0,80,.5,15,{shader:false}],['autoTurn','巡航转弯',0,1,.01,.12,{shader:false}],['cameraBob','镜头浮动',0,2,.01,.28,{shader:false}],['renderScale','渲染比例',.35,1,.05,.8,{shader:false}],['pixelRatio','像素密度',.5,2,.1,1,{shader:false}],['maxFPS','帧率上限',20,120,1,60,{shader:false}],['viewDistance','视距',180,1400,10,780],['raySteps','步进质量',.35,1,.01,.78],['shadowQuality','阴影质量',0,1,.01,.68],['cloudQuality','云层质量',0,1,.01,.62],['dynamicResolution','动态分辨率',0,1,1,1,{type:'check',shader:false}],['showHUD','显示状态栏',0,1,1,1,{type:'check',shader:false}]
+ ]}
+];
+const params={}, defaults={}, gpuDefs=[], flat=[];
+groups.forEach(g=>g.items.forEach(a=>{const [id,label,min,max,step,def,opt={}] = a, p={id,label,min,max,step,def,...opt,group:g.id};if(p.shader!==false){p.gpu=gpuDefs.length;gpuDefs.push(p)}flat.push(p);params[id]=def;defaults[id]=def}));
+const P=id=>`p[${paramsMeta(id).gpu}]`, paramsMeta=id=>flat.find(x=>x.id===id);
+document.querySelector('#paramCount').textContent=flat.length+' 项';
+
+const vsrc=`#version 300 es
+precision highp float;out vec2 vUv;void main(){vec2 p=vec2((gl_VertexID<<1)&2,gl_VertexID&2);vUv=p;gl_Position=vec4(p*2.0-1.0,0,1);}`;
+const fsrc=`#version 300 es
+precision highp float;precision highp int;out vec4 frag;in vec2 vUv;
+uniform vec2 uRes;uniform float uTime;uniform float uFocal;uniform vec3 uCam;uniform mat3 uCamMat;uniform vec3 uSun;uniform vec3 uMoon;uniform float uLightning;uniform float p[${gpuDefs.length}];
+#define PI 3.14159265359
+#define SAT(x) clamp(x,0.0,1.0)
+float hash11(float x){return fract(sin(x*127.1)*43758.5453123);}
+float hash21(vec2 x){return fract(sin(dot(x,vec2(127.1,311.7)))*43758.5453123);}
+vec2 hash22(vec2 x){return fract(sin(vec2(dot(x,vec2(127.1,311.7)),dot(x,vec2(269.5,183.3))))*43758.5453);}
+float noise(vec2 x){vec2 i=floor(x),f=fract(x);f=f*f*(3.-2.*f);return mix(mix(hash21(i),hash21(i+vec2(1,0)),f.x),mix(hash21(i+vec2(0,1)),hash21(i+1.),f.x),f.y);}
+float fbm(vec2 x){float f=0.,a=.5;mat2 m=mat2(.8,.6,-.6,.8);for(int i=0;i<5;i++){f+=a*noise(x);x=m*x*2.03+17.1;a*=.5;}return f;}
+vec3 hsv(float h,float s,float v){vec3 c=clamp(abs(mod(h*6.+vec3(0,4,2),6.)-3.)-1.,0.,1.);return v*mix(vec3(1),c,s);}
+float sdBox(vec3 q,vec3 b,float r){q=abs(q)-b;return length(max(q,0.))+min(max(q.x,max(q.y,q.z)),0.)-r;}
+struct Lot{vec2 q,id,center;float road,river,park,plaza,h,w,d,rnd,glass;};
+Lot getLot(vec3 x){
+ float bs=${P('blockSize')},rw=${P('roadWidth')},pitch=bs+rw;vec2 bid=floor((x.xz+pitch*.5)/pitch);vec2 bq=mod(x.xz+pitch*.5,pitch)-pitch*.5;
+ float ave=step(mod(abs(bid.x+bid.y*3.),max(2.,floor(${P('avenueEvery')}))),.1)*${P('avenueWidth')};float inside=step(max(abs(bq.x),abs(bq.y)),bs*.5-ave*.5);
+ float ls=${P('lotSize')};vec2 lid=floor((bq+bs*.5)/ls);vec2 lq=mod(bq+bs*.5,ls)-ls*.5;vec2 id=bid*97.+lid;vec2 center=x.xz-lq;
+ float seed=${P('seed')}*1.731;float r=hash21(id+seed),r2=hash21(id*2.31-seed),r3=hash21(id*5.13+seed);
+ float riverD=abs(center.x-sin(center.y*.0037+seed)*${P('riverBend')});float river=step(riverD,${P('riverWidth')}*.5);
+ float park=step(r,${P('parkRate')})*inside*(1.-river),plaza=step(${P('parkRate')},r)*step(r,${P('parkRate')}+${P('plazaRate')})*inside*(1.-river);
+ float district=mix(1.,.45+1.25*noise(center/${P('districtScale')}+seed),${P('districtMix')});float core=exp(-length(center)/${P('downtownRadius')})*${P('downtownBoost')};
+ float occ=step(r2,${P('density')})*inside*(1.-river)*(1.-park)*(1.-plaza);float h=${P('minHeight')}+pow(r3,max(.1,${P('heightCurve')}))*(${P('maxHeight')}-${P('minHeight')});h*=district*(1.+core);h*=mix(.55,1.55,step(1.-${P('towerChance')},hash21(id*9.7+3.)));
+ float w=ls*${P('coverage')}*mix(.72,1.,hash21(id+77.));float d=ls*${P('coverage')}*mix(.72,1.,hash21(id+91.));
+ Lot L;L.q=lq;L.id=id;L.center=center;L.road=1.-inside;L.river=river;L.park=park;L.plaza=plaza;L.h=h*occ;L.w=w;L.d=d;L.rnd=${P('roundness')};L.glass=step(hash21(id+43.),${P('glassAmount')});return L;
+}
+vec2 mapCity(vec3 x){
+ Lot L=getLot(x);float ground=x.y;float d=ground,mat=1.;
+ if(L.h>1.){float base=sdBox(vec3(L.q.x,x.y-L.h*.5,L.q.y),vec3(L.w*.5,L.h*.5,L.d*.5),min(L.rnd,min(L.w,L.d)*.15));
+  float cut=mix(.93,.48,${P('setback')});float top=sdBox(vec3(L.q.x,x.y-L.h*.76,L.q.y),vec3(L.w*.5*cut,L.h*.24,L.d*.5*cut),L.rnd);base=min(base,top);
+  if(${P('roofDetail')}>.04){float rh=mix(1.,5.,hash21(L.id+8.))*${P('roofDetail')};float roof=sdBox(vec3(L.q.x*.9,x.y-L.h-rh*.5,L.q.y*.9),vec3(L.w*.16,rh*.5,L.d*.14),.08);base=min(base,roof);}
+  if(hash21(L.id+121.)>1.-${P('spireChance')}){float ah=${P('antennaHeight')}*mix(.45,1.,hash21(L.id+19.));float spire=max(length(L.q)-mix(.035,.14,${P('roofDetail')}),abs(x.y-(L.h+ah*.5))-ah*.5);base=min(base,spire);}
+  if(base<d){d=base;mat=2.;}
+ }
+ return vec2(d,mat);
+}
+vec3 normalAt(vec3 x){vec2 e=vec2(.06,0);float d=mapCity(x).x;return normalize(vec3(mapCity(x+e.xyy).x-d,mapCity(x+e.yxy).x-d,mapCity(x+e.yyx).x-d));}
+float trace(vec3 ro,vec3 rd,out float mat){float t=.08;mat=0.;float maxD=${P('viewDistance')};for(int i=0;i<128;i++){vec2 h=mapCity(ro+rd*t);if(h.x<.025+ t*.00025){mat=h.y;return t;}t+=clamp(h.x*.72,.025,9.);if(t>maxD||float(i)>${P('raySteps')}*127.)break;}return maxD;}
+float shadow(vec3 ro,vec3 rd,float maxD){float s=1.,t=.3;for(int i=0;i<28;i++){float h=mapCity(ro+rd*t).x;s=min(s,${P('shadowSoftness')}*h/t);t+=clamp(h,.18,10.);if(h<.025||t>maxD||float(i)>${P('shadowQuality')}*27.)break;}return mix(1.,SAT(s),${P('shadowStrength')});}
+float ao(vec3 x,vec3 n){float a=0.,w=1.;for(int i=1;i<6;i++){float d=float(i)*.55;a+=(d-mapCity(x+n*d).x)*w;w*=.55;}return SAT(1.-a*.18*${P('aoStrength')});}
+vec3 atmosphere(vec3 rd){
+ float mu=dot(rd,uSun),up=SAT(rd.y*.5+.5),sunUp=SAT(uSun.y*5.+.35),night=1.-sunUp;
+ vec3 betaR=vec3(.18,.42,1.)*${P('rayleigh')};float rayPhase=.0597*(1.+mu*mu);float g=${P('mieG')};float miePhase=.0796*(1.-g*g)/pow(max(.06,1.+g*g-2.*g*mu),1.5);
+ float air=pow(1.-SAT(rd.y),2.2);vec3 day=mix(vec3(.12,.31,.68),vec3(.015,.17,.42),up);day+=betaR*rayPhase*(.15+air*.7);
+ vec3 sunset=vec3(1.2,.18,.025)*pow(SAT(mu),7.)*pow(1.-abs(rd.y),4.)*(1.-SAT(abs(uSun.y)*5.));day+=sunset*${P('horizonGlow')};day+=vec3(1.,.55,.22)*miePhase*${P('mie')}*.085;
+ vec3 ng=mix(vec3(.008,.012,.03),vec3(.015,.035,.08),up)*${P('nightAmbient')};vec3 col=mix(ng,day,sunUp)*${P('skyBrightness')};
+ float sun= smoothstep(cos(radians(${P('sunSize')})),1.,mu);col+=vec3(1.,.82,.55)*sun*${P('sunIntensity')}*(.7+sunUp);
+ float mm=dot(rd,uMoon);float moon=smoothstep(.99982,1.,mm)*step(.0,uMoon.y);float phase=smoothstep(-.3,.7,dot(normalize(rd-uMoon*.998),uSun));col+=vec3(.62,.72,1.)*moon*${P('moonIntensity')}*mix(.1,1.,${P('moonPhase')}*phase);
+ vec3 ad=abs(rd);vec2 suv=(ad.y>ad.x&&ad.y>ad.z?rd.xz/abs(rd.y):ad.x>ad.z?rd.zy/abs(rd.x):rd.xy/abs(rd.z))*850.;float st=pow(hash21(floor(suv)),34.);st*=smoothstep(.25,.65,night)*${P('starIntensity')};float milky=pow(SAT(1.-abs(dot(rd,normalize(vec3(.2,.82,.4))))),6.)*fbm(suv*.006)*${P('milkyWay')};col+=vec3(.68,.78,1.)*(st+milky*.08)*night;
+ col*=mix(vec3(1),vec3(.86,.95,1.08),${P('ozone')}*.16);return col;
+}
+vec4 clouds(vec3 ro,vec3 rd,vec3 sky){
+ if(rd.y<.015)return vec4(sky,0);float h=${P('cloudHeight')};float t=(h-ro.y)/rd.y;if(t<0.||t>${P('viewDistance')}*2.)return vec4(sky,0);vec2 wind=vec2(cos(radians(${P('windDirection')})),sin(radians(${P('windDirection')})))*uTime*${P('cloudSpeed')}*3.;vec2 q=(ro.xz+rd.xz*t+wind)/(220.*${P('cloudScale')});
+ float den=0.;for(int i=0;i<6;i++){float fi=float(i);float layer=fbm(q+rd.xz*fi*.12*${P('cloudThickness')}/180.+fi*13.7);den+=SAT((layer-(1.-${P('cloudCoverage')}))*(2.2+${P('cloudDensity')}))*exp(-fi*mix(.55,.14,SAT(${P('cloudThickness')}/500.)));if(fi>${P('cloudQuality')}*5.)break;}den=SAT(den*.34*${P('cloudDensity')});
+ float silver=pow(SAT(dot(rd,uSun)),12.)*SAT(uSun.y+.2);vec3 cc=mix(vec3(.08,.105,.14),vec3(.78,.82,.86),SAT(uSun.y*4.+.3));cc+=silver*vec3(1.,.7,.4);cc=mix(cc,sky,.18);return vec4(mix(sky,cc,den),den);
+}
+vec3 facade(vec3 x,vec3 n,Lot L,float dist){
+ float side=step(abs(n.z),abs(n.x));vec2 uv=vec2(mix(x.x,x.z,side),x.y);float wx=${P('windowWidth')},fy=${P('floorHeight')};vec2 cell=floor(uv/vec2(wx,fy));vec2 f=fract(uv/vec2(wx,fy));float frame=smoothstep(.06,.13,min(min(f.x,1.-f.x),min(f.y,1.-f.y)));
+ float rnd=hash21(cell+L.id*17.);float night=1.-SAT(uSun.y*5.+.3);float lit=step(1.-${P('windowLit')}*mix(.3,1.,night),rnd)*frame;float flick=.75+.25*sin(rnd*50.+uTime*.4);vec3 warm=mix(vec3(1.,.28,.06),vec3(.28,.65,1.),hash21(cell+8.));
+ vec3 base=hsv(fract(${P('facadeHue')}+(hash21(L.id)-.5)*${P('facadeVar')}*.22),mix(.08,.48,${P('facadeVar')}),mix(.11,.3,hash21(L.id+2.)));base*=.75+.25*noise(uv*.08);
+ float glass=frame*L.glass;vec3 reflected=atmosphere(reflect(normalize(x-uCam),n));base=mix(base,reflected*.42,glass*${P('glassAmount')});base=mix(base,warm*${P('emissive')}*flick,lit);
+ float signBand=step(.92,hash21(vec2(floor(uv.x/8.),L.id.y)))*step(.72,f.y)*step(x.y,L.h*.72);float neon=signBand*${P('neonAmount')};base+=hsv(hash21(L.id+cell),.8,${P('neonBrightness')})*neon;return base;
+}
+vec3 groundMat(vec3 x,Lot L,vec3 rd){
+ float bs=${P('blockSize')},rw=${P('roadWidth')},pitch=bs+rw;vec2 bq=mod(x.xz+pitch*.5,pitch)-pitch*.5;float road=step(bs*.5,min(abs(bq.x),abs(bq.y)))+L.road;road=SAT(road);float sidewalk=(1.-road)*step(bs*.5-2.3,max(abs(bq.x),abs(bq.y)));
+ vec3 asphalt=vec3(.024,.03,.038)*${P('roadBrightness')};float grit=noise(x.xz*1.7)*.025*${P('normalDetail')};asphalt+=grit;float markings=smoothstep(.22,.06,abs(mod(bq.x+pitch*.5,3.)-1.5))*step(abs(bq.y),rw*.58);markings+=smoothstep(.18,.05,abs(mod(bq.y+pitch*.5,3.)-1.5))*step(abs(bq.x),rw*.58);asphalt+=vec3(.7,.58,.25)*markings*.38;
+ vec3 block=vec3(.11,.12,.12)*(1.+grit*3.);block=mix(block,vec3(.17),sidewalk);if(L.park>.5){float grass=.5+.5*noise(x.xz*.35);block=vec3(.025,.13,.055)*grass*1.7;float trees=pow(hash21(floor(x.xz/3.)),16.);block+=vec3(.06,.22,.08)*trees;}
+ if(L.plaza>.5){vec2 tile=abs(fract(x.xz*.18)-.5);block=vec3(.15,.14,.13)-step(.47,max(tile.x,tile.y))*.05;}
+ vec3 col=mix(block,asphalt,road);float wet=${P('wetness')}*(.5+.5*${P('rain')});float pudd=step(1.-${P('puddle')},noise(x.xz*.09))*wet*road;vec3 refl=atmosphere(reflect(rd,vec3(0,1,0)));col=mix(col,refl*${P('reflection')},pudd*.64);
+ // Procedural moving traffic streams, lane lights and lamp pools.
+ float laneX=step(bs*.5,abs(bq.x))*step(abs(bq.y),rw*.42),laneY=step(bs*.5,abs(bq.y))*step(abs(bq.x),rw*.42);float flow=fract((x.z+x.x)*.035-uTime*.25*${P('vehicleSpeed')}+hash21(floor(x.xz/pitch)));float car=smoothstep(.045,0.,abs(flow-.5))*${P('trafficDensity')};vec3 carC=mix(vec3(1,.08,.02),vec3(.5,.75,1),step(.5,hash21(floor(x.xz)+4.)));col+=carC*car*(laneX+laneY)*${P('headlights')};float lamp=pow(hash21(floor(x.xz/9.)),30.)*road*${P('streetLights')};col+=vec3(1.,.52,.16)*lamp*2.;
+ if(L.river>.5){float wave=noise(x.xz*.22+uTime*.04);vec3 wr=atmosphere(reflect(rd,normalize(vec3((wave-.5)*.07,1.,(noise(x.zx*.2)-.5)*.07))));col=mix(vec3(.008,.035,.055),wr*${P('waterReflect')},.72);}
+ return col;
+}
+void main(){
+ vec2 uv=(gl_FragCoord.xy-.5*uRes)/uRes.y;vec3 rd=normalize(uCamMat*vec3(uv,uFocal));vec3 sky=atmosphere(rd);sky=clouds(uCam,rd,sky).rgb;float mat;float t=trace(uCam,rd,mat);vec3 col=sky;
+ if(t<${P('viewDistance')}){vec3 x=uCam+rd*t;vec3 n=normalAt(x);Lot L=getLot(x);vec3 albedo=mat>1.5?facade(x,n,L,t):groundMat(x,L,rd);float ndl=max(0.,dot(n,uSun));float sh=shadow(x+n*.12,uSun,180.);float day=SAT(uSun.y*5.+.4);vec3 sunC=mix(vec3(1.,.25,.08),vec3(1.,.92,.76),SAT(uSun.y*4.));vec3 light=vec3(${P('ambient')})*mix(.09,.55,day)+sunC*ndl*sh*${P('sunDiffuse')}*day;float moon=max(0.,dot(n,uMoon))*${P('moonIntensity')};light+=vec3(.22,.34,.58)*moon;float occ=ao(x,n);col=albedo*light*occ;
+  vec3 h=normalize(uSun-rd);float spec=pow(max(dot(n,h),0.),mix(8.,80.,1.-${P('roughness')}))*${P('specular')}*sh;col+=sunC*spec*day;float rim=pow(1.-abs(dot(n,rd)),4.)*${P('metalness')};col+=sky*rim*.25;
+  float fog=1.-exp(-t*${P('fogDensity')}*(1.+${P('haze')}*2.)*mix(1.,.35,SAT(x.y/${P('fogHeight')})));vec3 fogC=mix(sky,vec3(.42,.27,.2)*${P('lightPollution')},(1.-day)*SAT(1.-x.y/${P('fogHeight')}));col=mix(col,fogC,SAT(fog));float shafts=${P('volumetric')}*pow(SAT(dot(rd,uSun)),18.)*(1.-sh)*day;col+=sunC*shafts*.1;
+ }
+ float rain=${P('rain')};if(rain>.001){vec2 ruv=gl_FragCoord.xy/uRes.xy;float rx=hash21(vec2(floor(ruv.x*uRes.x/3.),floor(uTime*18.)));float streak=step(.965,fract(ruv.y*18.+ruv.x*7.+uTime*(2.+rx*3.)))*step(rx, rain);col+=vec3(.35,.48,.62)*streak*rain*${P('rainLength')};}
+ float snow=${P('snow')};if(snow>.001){vec2 suv=gl_FragCoord.xy/uRes.xy;float fl=pow(hash21(floor(suv*uRes.xy/5.)+floor(uTime*4.)),22.)*snow;col+=vec3(.8,.9,1.)*fl;}
+ col+=uLightning*vec3(.58,.7,1.4)*(1.+${P('storm')}*2.);col*=mix(vec3(1),vec3(1.+${P('temperatureWeather')}*.08,1.,1.-${P('temperatureWeather')}*.08),.8);frag=vec4(max(col,0.),SAT(t/${P('viewDistance')}));
+}`;
+
+const post=`#version 300 es
+precision highp float;out vec4 frag;uniform sampler2D uScene;uniform vec2 uRes;uniform float uTime;uniform float p[${gpuDefs.length}];
+#define SAT(x) clamp(x,0.0,1.0)
+float hash(vec2 q){return fract(sin(dot(q,vec2(12.9898,78.233)))*43758.5453);}
+vec3 tex(vec2 uv){return texture(uScene,uv).rgb;}
+vec3 tonemap(vec3 x){float mode=${P('toneMap')};if(mode<.5){const float a=2.51,b=.03,c=2.43,d=.59,e=.14;return SAT((x*(a*x+b))/(x*(c*x+d)+e));}if(mode<1.5)return x/(1.+x);x=max(vec3(0),x-.004);return (x*(6.2*x+.5))/(x*(6.2*x+1.7)+.06);}
+void main(){
+ vec2 uv=gl_FragCoord.xy/uRes;vec2 q=uv*2.-1.;float r2=dot(q,q);uv=.5+(uv-.5)*(1.+r2*${P('barrel')}*.15);float pix=${P('pixelate')};if(pix>.5)uv=(floor(uv*uRes/pix)+.5)*pix/uRes;
+ vec2 ca=(uv-.5)*${P('chromatic')}*.0025;vec3 col=vec3(texture(uScene,uv+ca).r,texture(uScene,uv).g,texture(uScene,uv-ca).b);float depth=texture(uScene,uv).a;vec2 px=1./uRes;
+ float coc=SAT(abs(depth-${P('focusDistance')}/${P('viewDistance')})*${P('aperture')}*${P('dof')});if(coc>.001){vec2 d=px*(1.+coc*7.);vec3 blur=tex(uv+vec2(d.x,0))+tex(uv-vec2(d.x,0))+tex(uv+vec2(0,d.y))+tex(uv-vec2(0,d.y));col=mix(col,blur*.25,coc);}vec2 motion=(uv-.5)*px*8.*${P('motionBlur')};col=mix(col,(col+tex(uv-motion)+tex(uv-motion*2.))/3.,${P('motionBlur')}*.72);
+ vec3 bloom=vec3(0);float br=${P('bloomRadius')}*2.+1.;for(int i=0;i<12;i++){float a=float(i)*.5236;vec2 o=vec2(cos(a),sin(a))*px*br*mix(1.,3.,float(i%3)/2.);vec3 c=tex(uv+o);bloom+=max(c-${P('bloomThreshold')},0.);}bloom/=12.;col+=bloom*${P('bloom')};
+ float lum=dot(col,vec3(.2126,.7152,.0722));float sunGlare=pow(SAT(1.-length(uv-.5)*1.6),8.)*max(0.,lum-1.);col+=vec3(1,.45,.15)*sunGlare*${P('glare')};float streak=max(0.,tex(vec2(mix(uv.x,.5,.85),uv.y)).r-${P('bloomThreshold')});col+=vec3(.3,.55,1.)*streak*${P('anamorphic')}*.3;
+ vec3 around=tex(uv+px*vec2(1,0))+tex(uv+px*vec2(-1,0))+tex(uv+px*vec2(0,1))+tex(uv+px*vec2(0,-1));col+=${P('sharpen')}*(col-around*.25)*.35;
+ col*=${P('exposure')};col=tonemap(col);col=mix(vec3(dot(col,vec3(.2126,.7152,.0722))),col,${P('saturation')});col=(col-.5)*${P('contrast')}+.5;col=pow(max(col,0.),vec3(1./${P('gamma')}));
+ col*=vec3(1.+${P('temperature')}*.12,1.+${P('tint')}*.04,1.-${P('temperature')}*.12);col.g*=1.-${P('tint')}*.08;float l=dot(col,vec3(.299,.587,.114));col=mix(col,vec3(col.r*1.07,col.g*.99,col.b*1.08),${P('tealOrange')}*SAT(l));col=mix(col,vec3(l)*.75+vec3(.08,.075,.07),${P('fade')});
+ float vig=1.-${P('vignette')}*SAT(r2*.55);col*=vig;float dirt=pow(hash(floor(uv*vec2(19,11))),18.)*${P('lensDirt')}*length(bloom);col+=dirt*vec3(.5,.3,.12);col+=(hash(gl_FragCoord.xy+uTime)-.5)*${P('grain')};col*=1.-${P('scanlines')}*.12*step(.5,fract(gl_FragCoord.y*.5));frag=vec4(SAT(col),1);
+}`;
+
+function compile(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);if(!gl.getShaderParameter(s,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(s));return s}
+function program(v,f){const p=gl.createProgram();gl.attachShader(p,compile(gl.VERTEX_SHADER,v));gl.attachShader(p,compile(gl.FRAGMENT_SHADER,f));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));return p}
+let sceneProg,postProg;
+try{sceneProg=program(vsrc,fsrc);postProg=program(vsrc,post)}catch(e){document.querySelector('#loading').innerHTML='<div class="loader">着色器编译失败<br><small>'+String(e).replace(/[<&]/g,'')+'</small></div>';console.error(e);return}
+const vao=gl.createVertexArray();gl.bindVertexArray(vao);const loc=(pr,n)=>gl.getUniformLocation(pr,n);
+const su={res:loc(sceneProg,'uRes'),time:loc(sceneProg,'uTime'),focal:loc(sceneProg,'uFocal'),cam:loc(sceneProg,'uCam'),mat:loc(sceneProg,'uCamMat'),sun:loc(sceneProg,'uSun'),moon:loc(sceneProg,'uMoon'),lightning:loc(sceneProg,'uLightning'),p:loc(sceneProg,'p[0]')};
+const pu={res:loc(postProg,'uRes'),time:loc(postProg,'uTime'),p:loc(postProg,'p[0]'),scene:loc(postProg,'uScene')};
+let fbo=gl.createFramebuffer(),texScene=gl.createTexture(),fbW=0,fbH=0;
+function resizeTarget(w,h){if(w===fbW&&h===fbH)return;fbW=w;fbH=h;gl.bindTexture(gl.TEXTURE_2D,texScene);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,texScene,0);if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('Framebuffer incomplete');gl.bindFramebuffer(gl.FRAMEBUFFER,null)}
+
+const gpuValues=new Float32Array(gpuDefs.length);function syncGPU(){gpuDefs.forEach(x=>gpuValues[x.gpu]=+params[x.id])}
+const controls=document.querySelector('#controls'),tabs=document.querySelector('#tabs');
+function format(p,v){if(p.type==='check')return v?'开':'关';if(p.type==='select')return p.options[Math.round(v)];if(p.id==='timeOfDay'){let h=Math.floor(v),m=Math.floor((v-h)*60);return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')}if(p.step<.001)return (+v).toFixed(4);if(p.step<.01)return (+v).toFixed(3);if(p.step<.1)return (+v).toFixed(2);return Number.isInteger(+v)?v:(+v).toFixed(1)}
+groups.forEach((g,gi)=>{let tb=document.createElement('button');tb.textContent=g.name.slice(0,4);tb.dataset.group=g.id;tb.className=gi===0?'active':'';tabs.append(tb);let d=document.createElement('details');d.className='section';d.dataset.group=g.id;d.open=gi<2;d.innerHTML=`<summary>${g.name}<span class="sectionCount">${g.items.length}</span></summary><div class="rows"></div>`;let rows=d.querySelector('.rows');g.items.forEach(a=>{let p=paramsMeta(a[0]),row=document.createElement('div');row.className='control';row.dataset.search=(p.label+p.id).toLowerCase();let input;if(p.type==='check'){input=document.createElement('input');input.type='checkbox';input.checked=!!params[p.id];}else if(p.type==='select'){input=document.createElement('select');p.options.forEach((o,i)=>input.add(new Option(o,i)));input.value=params[p.id];}else{input=document.createElement('input');input.type='range';input.min=p.min;input.max=p.max;input.step=p.step;input.value=params[p.id]}let label=document.createElement('label');label.textContent=p.label;label.title=p.id+' · 双击恢复默认';let out=document.createElement('output');out.textContent=format(p,params[p.id]);row.append(label,input,out);rows.append(row);p.el=input;p.out=out;input.addEventListener('input',()=>{params[p.id]=p.type==='check'?(input.checked?1:0):+input.value;out.textContent=format(p,params[p.id]);onParam(p)});label.addEventListener('dblclick',()=>setParam(p.id,p.def));});controls.append(d)});
+function onParam(p){if(p.shader!==false)syncGPU();if(['renderScale','pixelRatio'].includes(p.id))resize();if(p.id==='showHUD')document.querySelector('.top').style.opacity=params.showHUD?'1':'0'}
+function setParam(id,v){let p=paramsMeta(id);v=Math.min(p.max,Math.max(p.min,v));params[id]=v;if(p.type==='check')p.el.checked=!!v;else p.el.value=v;p.out.textContent=format(p,v);onParam(p)}
+function apply(obj){Object.keys(obj).forEach(k=>{if(paramsMeta(k))setParam(k,obj[k])})}
+tabs.addEventListener('click',e=>{if(e.target.tagName!=='BUTTON')return;tabs.querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===e.target));let d=controls.querySelector(`[data-group="${e.target.dataset.group}"]`);d.open=true;d.scrollIntoView({behavior:'smooth',block:'start'})});
+document.querySelector('#search').addEventListener('input',e=>{let q=e.target.value.toLowerCase();controls.querySelectorAll('.control').forEach(x=>x.classList.toggle('hiddenRow',q&&!x.dataset.search.includes(q)));if(q)controls.querySelectorAll('details').forEach(x=>x.open=true)});
+
+const presets={
+ day:{timeOfDay:13.2,cloudCoverage:.2,rain:0,snow:0,wetness:.05,fogDensity:.0008,exposure:1.1,bloom:.4,starIntensity:.3,windowLit:.22},
+ night:{timeOfDay:22.4,cloudCoverage:.18,rain:0,wetness:.32,fogDensity:.0022,exposure:1.18,bloom:1.05,starIntensity:1.5,windowLit:.78,neonAmount:.56,lightPollution:.7},
+ storm:{timeOfDay:17.8,cloudCoverage:.94,cloudDensity:1.45,rain:.92,wetness:1,puddle:.82,storm:.86,lightningRate:.7,fogDensity:.005,bloom:.9,exposure:.82,windDirection:210,cloudSpeed:2.2}
+};
+document.querySelector('#presetDay').onclick=()=>{apply(presets.day);toast('已切换：澄澈昼景')};document.querySelector('#presetNight').onclick=()=>{apply(presets.night);toast('已切换：霓虹夜景')};document.querySelector('#presetStorm').onclick=()=>{apply(presets.storm);toast('已切换：雷暴都市')};
+document.querySelector('#reset').onclick=()=>{apply(defaults);toast('全部参数已恢复默认')};
+document.querySelector('#randomize').onclick=()=>{apply({seed:Math.random()*999,timeOfDay:Math.random()*24,density:.6+Math.random()*.38,maxHeight:70+Math.random()*150,downtownBoost:.3+Math.random()*1.8,facadeHue:Math.random(),neonAmount:Math.random()*.75,cloudCoverage:Math.random()*.8,fogDensity:Math.random()*.005,wetness:Math.random(),temperature:(Math.random()-.5)*.4});toast('已生成新的城市情绪')};
+document.querySelector('#export').onclick=()=>{let b=new Blob([JSON.stringify({engine:'Skyline Engine',version:1,params},null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='skyline-city-preset.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+document.querySelector('#import').onclick=()=>document.querySelector('#fileInput').click();document.querySelector('#fileInput').onchange=async e=>{try{let o=JSON.parse(await e.target.files[0].text());apply(o.params||o);toast('预设导入成功')}catch(err){toast('预设文件无效')}};
+document.querySelector('#help').onclick=()=>toast('WASD 移动 · Q/E 升降 · 拖拽环顾 · Shift 加速 · P 暂停时间 · H 隐藏界面');
+document.querySelector('#toggle').onclick=()=>panel.classList.toggle('hidden');document.querySelector('#full').onclick=()=>document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();
+document.querySelector('#photo').onclick=()=>{let a=document.createElement('a');a.download='skyline-'+Date.now()+'.png';a.href=canvas.toDataURL('image/png');a.click();toast('画面已保存')};
+function toast(s){toastEl.textContent=s;toastEl.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove('show'),2200)}
+
+let cam={x:33.8,y:52,z:-16,yaw:.05,pitch:-.09},keys={},drag=false,lastX=0,lastY=0,lastFrame=0,lastRender=0,fps=60,fpsAcc=0,fpsN=0,fpsStamp=0,adaptive=1,lightning=0;
+addEventListener('keydown',e=>{keys[e.code]=true;if(e.code==='KeyH'){panel.classList.toggle('hidden');document.querySelector('#hint').style.opacity=panel.classList.contains('hidden')?'0':'1'}if(e.code==='KeyP')setParam('pauseTime',params.pauseTime?0:1)});addEventListener('keyup',e=>keys[e.code]=false);
+canvas.addEventListener('pointerdown',e=>{drag=true;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId)});canvas.addEventListener('pointerup',()=>drag=false);canvas.addEventListener('pointermove',e=>{if(!drag)return;cam.yaw-=(e.clientX-lastX)*params.mouseSensitivity*.009;cam.pitch-=(e.clientY-lastY)*params.mouseSensitivity*.009;cam.pitch=Math.max(-1.35,Math.min(1.35,cam.pitch));lastX=e.clientX;lastY=e.clientY});canvas.addEventListener('wheel',e=>{cam.y=Math.max(2,cam.y+e.deltaY*.02)},{passive:true});
+function resize(){let pr=Math.min(2,devicePixelRatio*params.pixelRatio),scale=params.renderScale*adaptive,w=Math.max(320,Math.floor(innerWidth*pr*scale)),h=Math.max(180,Math.floor(innerHeight*pr*scale));if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';resizeTarget(w,h)}}addEventListener('resize',resize);
+function sunPosition(){let lat=params.latitude*Math.PI/180,dec=-23.44*Math.cos((params.dayOfYear+10)/365*Math.PI*2)*Math.PI/180,h=(params.timeOfDay-12)*15*Math.PI/180;let y=Math.sin(lat)*Math.sin(dec)+Math.cos(lat)*Math.cos(dec)*Math.cos(h),alt=Math.asin(y),az=Math.atan2(Math.sin(h),Math.cos(h)*Math.sin(lat)-Math.tan(dec)*Math.cos(lat))+params.northOffset*Math.PI/180,ca=Math.cos(alt);return [Math.sin(az)*ca,Math.sin(alt),Math.cos(az)*ca]}
+function mat3(){let cy=Math.cos(cam.yaw),sy=Math.sin(cam.yaw),cp=Math.cos(cam.pitch),sp=Math.sin(cam.pitch);let f=[sy*cp,sp,cy*cp],r=[cy,0,-sy],u=[-sy*sp,cp,-cy*sp];return new Float32Array([r[0],r[1],r[2],u[0],u[1],u[2],f[0],f[1],f[2]])}
+function render(now,force=false){requestAnimationFrame(render);let dt=Math.min(.05,(now-lastFrame)/1000||.016);lastFrame=now;if(!force&&now-lastRender<1000/params.maxFPS)return;lastRender=now;
+ if(!params.pauseTime)params.timeOfDay=(params.timeOfDay+dt*params.timeSpeed/3600)%24;let tp=paramsMeta('timeOfDay');tp.el.value=params.timeOfDay;tp.out.textContent=format(tp,params.timeOfDay);
+ let speed=params.cameraSpeed*(keys.ShiftLeft||keys.ShiftRight?params.sprintMultiplier:1),mx=(keys.KeyD?1:0)-(keys.KeyA?1:0),mz=(keys.KeyW?1:0)-(keys.KeyS?1:0),my=(keys.KeyE?1:0)-(keys.KeyQ?1:0);if(params.autoFly&&!mx&&!mz){mz=params.autoFlySpeed/Math.max(1,params.cameraSpeed);cam.yaw+=Math.sin(now*.00007)*params.autoTurn*dt*.12}
+ cam.x+=(Math.sin(cam.yaw)*mz+Math.cos(cam.yaw)*mx)*speed*dt;cam.z+=(Math.cos(cam.yaw)*mz-Math.sin(cam.yaw)*mx)*speed*dt;cam.y=Math.max(2.2,cam.y+my*speed*dt+Math.sin(now*.0017)*params.cameraBob*dt);
+ if(params.storm>0&&Math.random()<params.lightningRate*params.storm*dt*.13)lightning=1;lightning=Math.max(0,lightning-dt*3.4);
+ syncGPU();resize();let sun=sunPosition(),moon=sun.map(v=>-v);
+ gl.bindFramebuffer(gl.FRAMEBUFFER,fbo);gl.viewport(0,0,fbW,fbH);gl.useProgram(sceneProg);gl.uniform2f(su.res,fbW,fbH);gl.uniform1f(su.time,now*.001);gl.uniform1f(su.focal,.5/Math.tan(params.fov*Math.PI/360));gl.uniform3f(su.cam,cam.x,cam.y,cam.z);gl.uniformMatrix3fv(su.mat,false,mat3());gl.uniform3fv(su.sun,sun);gl.uniform3fv(su.moon,moon);gl.uniform1f(su.lightning,lightning);gl.uniform1fv(su.p,gpuValues);gl.drawArrays(gl.TRIANGLES,0,3);
+ gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.viewport(0,0,canvas.width,canvas.height);gl.useProgram(postProg);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texScene);gl.uniform1i(pu.scene,0);gl.uniform2f(pu.res,canvas.width,canvas.height);gl.uniform1f(pu.time,now*.001);gl.uniform1fv(pu.p,gpuValues);gl.drawArrays(gl.TRIANGLES,0,3);
+ fpsAcc+=1/dt;fpsN++;if(now-fpsStamp>500){fps=fpsAcc/fpsN;fpsAcc=fpsN=0;fpsStamp=now;document.querySelector('#perf').textContent=Math.round(fps)+' FPS';if(params.dynamicResolution){if(fps<params.maxFPS*.58&&adaptive>.56)adaptive-=.05;else if(fps>params.maxFPS*.88&&adaptive<1)adaptive+=.025}}
+ let hh=Math.floor(params.timeOfDay),mm=Math.floor((params.timeOfDay-hh)*60);document.querySelector('#clock').textContent=String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0');document.querySelector('#weatherChip').textContent=params.rain>.4?'降雨':params.snow>.3?'降雪':params.storm>.3?'风暴':params.cloudCoverage>.65?'阴云':params.cloudCoverage>.3?'多云':'晴朗';
+}
+syncGPU();resize();requestAnimationFrame(render);setTimeout(()=>{let l=document.querySelector('#loading');l.style.opacity=0;setTimeout(()=>l.remove(),550)},450);setTimeout(()=>document.querySelector('#hint').style.opacity=.35,8000);
+})();
+</script>
+</body>
+</html>
