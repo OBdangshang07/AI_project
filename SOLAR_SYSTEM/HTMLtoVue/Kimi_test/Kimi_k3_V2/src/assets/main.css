@@ -1,0 +1,80 @@
+/* ============ 全局样式（与原单文件版 <style> 完全一致） ============ */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#04060f;
+  font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;color:#dfe6f5;
+  user-select:none;-webkit-user-select:none}
+#scene{position:fixed;inset:0;z-index:1}
+#labelLayer{position:fixed;inset:0;z-index:2;pointer-events:none;overflow:hidden}
+/* 升级：CSS 暗角（零 GPU 开销的电影感画框） */
+#vignette{position:fixed;inset:0;z-index:3;pointer-events:none;
+  background:radial-gradient(ellipse at center, transparent 52%, rgba(2,4,12,.55) 100%)}
+.lbl{color:rgba(255,255,255,.82);font-size:12px;letter-spacing:.6px;white-space:nowrap;
+  text-shadow:0 0 7px rgba(150,180,255,.9),0 1px 3px rgba(0,0,0,.9);
+  pointer-events:none;transform:translateY(-4px);transition:opacity .2s}
+.glass{background:rgba(12,18,34,.55);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border:1px solid rgba(140,170,255,.18);border-radius:14px;box-shadow:0 4px 30px rgba(0,0,0,.45)}
+#title{position:fixed;top:14px;left:16px;z-index:10;padding:8px 16px;font-size:13px;
+  letter-spacing:1.5px;color:#b9c8ee}
+#title b{color:#fff;font-weight:600}
+#fps{position:fixed;top:14px;right:16px;z-index:10;padding:8px 16px;font-size:13px;
+  color:#9fe8b0;min-width:86px;text-align:center}
+#count{position:fixed;bottom:14px;right:16px;z-index:10;padding:8px 16px;font-size:12px;color:#b9c8ee}
+#topbar{position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:10;
+  display:flex;flex-direction:column;align-items:center;gap:8px}
+#datetime{padding:8px 26px;font-size:15px;letter-spacing:2.5px;color:#cfe0ff;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+#searchWrap{position:relative;padding:6px 10px;width:280px}
+#searchInput{width:100%;background:transparent;border:none;outline:none;color:#eaf0ff;
+  font-size:13px;padding:4px 6px;user-select:text;-webkit-user-select:text}
+#searchInput::placeholder{color:rgba(200,215,255,.4)}
+#searchResults{position:absolute;top:100%;left:0;width:100%;margin-top:6px;border-radius:10px;
+  background:rgba(10,15,30,.88);backdrop-filter:blur(14px);border:1px solid rgba(140,170,255,.2);
+  display:none;max-height:260px;overflow-y:auto;z-index:11}
+#searchResults .sr{padding:8px 14px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;gap:12px}
+#searchResults .sr:hover{background:rgba(90,130,255,.18)}
+#searchResults .sr .en{color:rgba(180,200,255,.55);font-size:11px}
+#infoPanel{position:fixed;left:16px;top:86px;width:288px;z-index:10;padding:18px 20px;
+  transition:opacity .35s,transform .35s}
+#infoPanel h3{font-size:19px;font-weight:600;color:#fff;letter-spacing:1px}
+#infoSub{font-size:11.5px;color:rgba(190,205,240,.65);margin:3px 0 12px}
+.irow{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;
+  border-bottom:1px dashed rgba(140,170,255,.12);font-size:12.5px}
+.irow span{color:rgba(180,195,235,.65)}
+.irow b{color:#eef3ff;font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+#ctrlPanel{position:fixed;right:16px;top:86px;width:252px;z-index:10;padding:16px 18px;
+  max-height:calc(100vh - 140px);overflow-y:auto;scrollbar-width:thin}
+#ctrlPanel::-webkit-scrollbar{width:5px}
+#ctrlPanel::-webkit-scrollbar-thumb{background:rgba(120,150,230,.35);border-radius:3px}
+#ctrlPanel h3{font-size:14px;font-weight:600;color:#fff;margin-bottom:6px;letter-spacing:1px}
+#ctrlPanel h4{font-size:10.5px;color:rgba(150,175,235,.55);margin:12px 0 4px;letter-spacing:2.5px;font-weight:600}
+#ctrlPanel .row{margin:6px 0;font-size:12.5px}
+#ctrlPanel label{display:flex;align-items:center;gap:8px;cursor:pointer;color:#cdd8f2}
+#ctrlPanel input[type=checkbox]{accent-color:#6f9bff;width:14px;height:14px;cursor:pointer}
+.sliderRow{display:grid;grid-template-columns:64px 1fr 48px;align-items:center;gap:8px}
+.sliderRow span{color:rgba(180,195,235,.75)}
+.sliderRow b{text-align:right;color:#9fd0ff;font-weight:600;font-size:12px}
+input[type=range]{-webkit-appearance:none;width:100%;height:4px;border-radius:2px;
+  background:rgba(120,150,230,.3);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;
+  border-radius:50%;background:#8db4ff;box-shadow:0 0 8px rgba(140,180,255,.8);cursor:pointer}
+#ctrlPanel button,#presets button{background:rgba(90,130,255,.14);border:1px solid rgba(140,170,255,.3);
+  color:#d8e4ff;font-size:12.5px;padding:7px 14px;border-radius:9px;cursor:pointer;
+  letter-spacing:.5px;transition:all .2s;backdrop-filter:blur(10px)}
+#ctrlPanel button{width:100%}
+#ctrlPanel button:hover,#presets button:hover{background:rgba(110,150,255,.32);
+  box-shadow:0 0 14px rgba(120,160,255,.35)}
+#ctrlPanel button.on{background:rgba(140,180,255,.38);box-shadow:0 0 14px rgba(120,160,255,.5)}
+.rowFlex{display:flex;gap:6px}
+.rowFlex button{flex:0 0 auto}
+#dateInput{flex:1;min-width:0;background:rgba(20,28,50,.6);border:1px solid rgba(140,170,255,.25);
+  border-radius:8px;color:#d8e4ff;font-size:12px;padding:5px 8px;outline:none;font-family:inherit}
+#dateInput::-webkit-calendar-picker-indicator{filter:invert(.8);cursor:pointer}
+#presets{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);z-index:10;display:flex;gap:8px}
+#hint{position:fixed;bottom:14px;left:16px;z-index:10;padding:7px 14px;font-size:11px;
+  color:rgba(180,195,235,.55);letter-spacing:.5px}
+/* 升级：导览横幅 / 测距结果框 */
+#tourBar{position:fixed;top:112px;left:50%;transform:translateX(-50%);z-index:10;
+  padding:8px 22px;font-size:12.5px;color:#ffe9b0;letter-spacing:1px;display:none;white-space:nowrap}
+#measureBox{position:fixed;bottom:64px;left:50%;transform:translateX(-50%);z-index:10;
+  padding:8px 22px;font-size:12.5px;color:#ffe08a;letter-spacing:.5px;display:none;white-space:nowrap}
+@media (max-width:1100px){#infoPanel,#ctrlPanel{display:none}}

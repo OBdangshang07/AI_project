@@ -1,0 +1,71 @@
+/* ============ 全局样式（与原单文件版 <style> 一致；仅 #app 更名为 #scene-root 以避免与 Vue 挂载点冲突） ============ */
+:root { color-scheme: dark; --cyan:#8eeaff; --line:rgba(151,220,255,.18); --glass:rgba(8,16,33,.58); }
+* { box-sizing:border-box; }
+html, body { width:100%; height:100%; margin:0; overflow:hidden; background:#01030a; font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif; }
+#scene-root, #canvas-wrap { position:fixed; inset:0; }
+canvas { display:block; }
+#labels { position:fixed; inset:0; pointer-events:none; z-index:3; }
+.glass { background:linear-gradient(145deg,rgba(17,31,57,.70),rgba(4,10,24,.48)); border:1px solid rgba(156,222,255,.15); box-shadow:0 18px 60px rgba(0,0,0,.36), inset 0 1px rgba(255,255,255,.05); backdrop-filter:blur(18px) saturate(135%); -webkit-backdrop-filter:blur(18px) saturate(135%); }
+#topbar { position:fixed; z-index:10; left:50%; top:16px; transform:translateX(-50%); width:min(760px,calc(100vw - 520px)); min-width:420px; height:48px; border-radius:16px; display:flex; align-items:center; gap:12px; padding:7px 12px; }
+#date { flex:1; text-align:center; font-size:12px; letter-spacing:.13em; color:#d9f7ff; text-shadow:0 0 14px #5fdfff; white-space:nowrap; }
+.searchbox { position:relative; width:260px; }
+#search { width:100%; height:33px; border:1px solid rgba(153,222,255,.18); border-radius:11px; padding:0 33px 0 13px; outline:none; color:#eefcff; background:rgba(1,6,18,.48); letter-spacing:.04em; }
+#search:focus { border-color:rgba(123,224,255,.55); box-shadow:0 0 0 3px rgba(75,205,255,.08); }
+#search-results { position:absolute; top:39px; left:0; right:0; border-radius:12px; padding:5px; max-height:280px; overflow:auto; display:none; pointer-events:auto; }
+.result { padding:9px 10px; border-radius:8px; font-size:12px; color:#dcefff; cursor:pointer; }
+.result:hover { background:rgba(102,203,255,.14); }
+.result span { opacity:.5; float:right; }
+#info { position:fixed; z-index:9; left:16px; top:80px; bottom:74px; width:250px; padding:20px; border-radius:20px; overflow:hidden; pointer-events:auto; }
+.eyebrow { color:#75dfff; font-size:9px; letter-spacing:.27em; text-transform:uppercase; opacity:.8; }
+#info h1 { font-size:26px; margin:7px 0 1px; font-weight:350; letter-spacing:.05em; text-shadow:0 0 22px rgba(80,210,255,.35); }
+#info-en { color:#90a7bb; font-size:11px; letter-spacing:.16em; text-transform:uppercase; margin-bottom:18px; }
+#info-desc { font-size:11px; line-height:1.75; color:#a9bdcf; min-height:58px; margin-bottom:15px; }
+.metric { padding:8px 0; border-top:1px solid rgba(160,220,255,.09); display:grid; grid-template-columns:1fr auto; gap:8px; align-items:end; }
+.metric label { font-size:10px; color:#71899f; }
+.metric b { font-weight:400; color:#e8faff; font-size:11px; font-variant-numeric:tabular-nums; text-align:right; }
+#right { position:fixed; z-index:9; right:16px; top:80px; width:232px; max-height:calc(100vh - 118px); overflow:auto; scrollbar-width:none; padding:17px; border-radius:20px; pointer-events:auto; }
+#right::-webkit-scrollbar { display:none; }
+.panel-title { font-size:10px; letter-spacing:.22em; color:#8ceaff; margin:0 0 13px; }
+.toggle { display:flex; justify-content:space-between; align-items:center; height:29px; color:#afc1d0; font-size:11px; }
+.switch { position:relative; width:31px; height:16px; }
+.switch input { display:none; }
+.switch i { position:absolute; inset:0; border-radius:10px; background:rgba(78,102,127,.38); border:1px solid rgba(154,207,233,.18); transition:.25s; }
+.switch i:after { content:""; width:10px; height:10px; border-radius:50%; background:#8094a7; position:absolute; left:2px; top:2px; transition:.25s; }
+.switch input:checked+i { background:rgba(34,180,228,.38); box-shadow:0 0 12px rgba(0,201,255,.24); }
+.switch input:checked+i:after { left:17px; background:#b9f5ff; box-shadow:0 0 8px #6fe8ff; }
+.range-row { margin:11px 0 4px; }
+.range-row header { display:flex; justify-content:space-between; font-size:10px; color:#8299ad; margin-bottom:6px; }
+.range-row output { color:#c9f6ff; }
+input[type=range] { appearance:none; width:100%; height:3px; background:linear-gradient(90deg,#28c7ef,#53657c); border-radius:4px; outline:none; }
+input[type=range]::-webkit-slider-thumb { appearance:none; width:12px; height:12px; border-radius:50%; background:#d8fbff; box-shadow:0 0 10px #43dfff; cursor:pointer; }
+button { color:#caeaf3; border:1px solid rgba(145,217,244,.17); background:rgba(18,46,70,.34); border-radius:9px; height:31px; font-size:10px; letter-spacing:.06em; cursor:pointer; transition:.2s; }
+button:hover { color:white; background:rgba(44,128,167,.30); border-color:rgba(119,224,255,.42); box-shadow:0 0 18px rgba(54,204,255,.10); }
+#direction, #reset { width:100%; margin-top:10px; }
+.micro-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:5px; margin-top:10px; }
+.micro-grid button { padding:0 3px; letter-spacing:0; }
+.section-rule { height:1px; margin:13px 0 10px; background:linear-gradient(90deg,transparent,rgba(118,220,255,.25),transparent); }
+#presets { position:fixed; z-index:9; bottom:17px; left:50%; transform:translateX(-50%); border-radius:15px; padding:7px; display:flex; gap:6px; pointer-events:auto; }
+#presets button { padding:0 13px; }
+#fps { position:fixed; z-index:11; top:18px; right:18px; color:#8de9c7; font:10px ui-monospace,monospace; text-shadow:0 0 9px #35f2b6; pointer-events:none; }
+#count { position:fixed; z-index:11; bottom:18px; right:19px; color:#6e8ca2; font:10px ui-monospace,monospace; pointer-events:none; }
+#hint { position:fixed; z-index:8; left:280px; bottom:24px; font-size:9px; letter-spacing:.08em; color:rgba(173,212,228,.42); pointer-events:none; }
+#science-hud { position:fixed; z-index:8; left:50%; top:76px; transform:translateX(-50%); min-width:380px; padding:7px 14px; border-radius:12px; text-align:center; color:rgba(190,231,244,.72); font:9px ui-monospace,monospace; letter-spacing:.06em; pointer-events:none; transition:.3s; }
+#tool-dock { position:fixed; z-index:9; left:280px; bottom:17px; border-radius:14px; padding:7px; display:flex; gap:6px; pointer-events:auto; }
+#tool-dock button { padding:0 10px; }
+#tool-dock button.active { color:#fff; border-color:#78e9ff; background:rgba(22,174,218,.26); box-shadow:0 0 16px rgba(69,221,255,.2); }
+#scale-ruler { position:fixed; z-index:8; right:20px; bottom:42px; color:rgba(174,210,225,.65); font:9px ui-monospace,monospace; text-align:right; pointer-events:none; }
+#scale-ruler i { display:block; height:5px; width:100px; border:1px solid rgba(136,222,255,.55); border-top:0; margin:0 0 4px auto; box-shadow:0 0 7px rgba(68,202,255,.18); }
+#tour-card { position:fixed; z-index:8; left:50%; bottom:72px; transform:translateX(-50%) translateY(18px); width:min(440px,calc(100vw - 560px)); padding:13px 17px; border-radius:15px; opacity:0; pointer-events:none; transition:.45s; }
+#tour-card.show { opacity:1; transform:translateX(-50%) translateY(0); }
+#tour-card b { display:block; color:#dffaff; font-size:13px; font-weight:450; margin-bottom:4px; }
+#tour-card span { color:#8eaec1; font-size:10px; line-height:1.55; }
+#toast { position:fixed; z-index:20; left:50%; top:126px; transform:translateX(-50%) translateY(-8px); color:#dffaff; padding:8px 14px; border-radius:11px; font-size:10px; opacity:0; pointer-events:none; transition:.3s; }
+#toast.show { opacity:1; transform:translateX(-50%); }
+.measure-label { color:#8ef4ff; font:9px ui-monospace,monospace; white-space:nowrap; text-shadow:0 0 8px #1bc7ff; }
+.celestial-label { color:rgba(235,249,255,.87); font-size:10px; letter-spacing:.08em; white-space:nowrap; text-shadow:0 0 5px #8ae6ff,0 0 13px #3a91ff,0 2px 4px #000; transform:translate(-50%,-50%); transition:opacity .25s; }
+.celestial-label:before { content:""; display:inline-block; width:11px; height:1px; margin-right:6px; vertical-align:middle; background:linear-gradient(90deg,transparent,#a7efff); box-shadow:0 0 5px #6bdfff; }
+.celestial-label.dwarf { color:rgba(221,230,255,.72); font-size:9px; }
+.celestial-label.moon { color:rgba(225,237,246,.67); font-size:8px; }
+.celestial-label.selected { color:#fff; font-size:11px; text-shadow:0 0 7px #fff,0 0 18px #3fcaff; }
+#vignette { position:fixed; inset:0; z-index:4; pointer-events:none; background:radial-gradient(circle at 50% 48%,transparent 48%,rgba(0,2,10,.18) 78%,rgba(0,0,4,.52) 115%); }
+@media(max-width:1200px){ #info{width:215px} #right{width:205px} #topbar{width:430px;left:50%;min-width:0} .searchbox{width:190px} #hint,#science-hud{display:none} #tool-dock{left:50%;bottom:61px;transform:translateX(-50%)} #tour-card{width:360px;bottom:104px} }
