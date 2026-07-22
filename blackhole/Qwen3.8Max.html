@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>卡冈图雅 · GARGANTUA — 事件视界观测站</title>
+<style>
+/* ============================================================
+   GARGANTUA — 黑洞观测站 HUD
+   显示字体：重型无衬线（描边/实心混排） · 数据字体：等宽
+   双色系：吸积盘琥珀金 × 遥测冰蓝
+   ============================================================ */
+:root{
+  --amber:   #ffb35c;
+  --amber-hi:#ffdcA6;
+  --ember:   #ff7a2f;
+  --ice:     #a9d7ff;
+  --ink:     #ece7db;
+  --dim:     #8f8779;
+  --line:    rgba(255,179,92,.30);
+  --mono: "Cascadia Code","JetBrains Mono",Consolas,"SF Mono",Menlo,"Courier New",monospace;
+  --disp: "Arial Black","Avenir Next","Segoe UI Black","Microsoft YaHei","PingFang SC",sans-serif;
+}
+*{ margin:0; padding:0; box-sizing:border-box; }
+html,body{ height:100%; overflow:hidden; background:#020308; }
+body{ font-family:var(--mono); color:var(--ink); -webkit-font-smoothing:antialiased; }
+::selection{ background:rgba(255,160,70,.35); color:#fff; }
+
+canvas#view{
+  position:fixed; inset:0; width:100vw; height:100vh; display:block;
+  cursor:grab; touch-action:none; z-index:0;
+}
+canvas#view.dragging{ cursor:grabbing; }
+
+/* ---------- 全局氛围层 ---------- */
+.scan{
+  position:fixed; inset:0; z-index:2; pointer-events:none;
+  background:repeating-linear-gradient(0deg,
+    rgba(255,255,255,.014) 0 1px, transparent 1px 3px);
+  mix-blend-mode:overlay;
+}
+.sweep{
+  position:fixed; left:0; right:0; top:-16%; height:130px; z-index:2;
+  pointer-events:none;
+  background:linear-gradient(180deg, transparent, rgba(150,195,255,.05), transparent);
+  animation:sweep 13s linear infinite;
+}
+@keyframes sweep{ from{ top:-16%; } to{ top:112%; } }
+
+/* ---------- HUD 骨架 ---------- */
+.hud{ position:fixed; inset:0; z-index:10; pointer-events:none; }
+
+.corner{ position:absolute; width:26px; height:26px; opacity:.75;
+  border:1px solid rgba(255,179,92,.42); animation:cornerPulse 6s ease-in-out infinite alternate; }
+.corner.tl{ top:14px; left:14px;  border-right:0; border-bottom:0; }
+.corner.tr{ top:14px; right:14px; border-left:0;  border-bottom:0; }
+.corner.bl{ bottom:14px; left:14px;  border-right:0; border-top:0; }
+.corner.br{ bottom:14px; right:14px; border-left:0;  border-top:0; }
+@keyframes cornerPulse{ from{ opacity:.4; } to{ opacity:.9; } }
+
+/* ---------- 顶栏 ---------- */
+.top{
+  position:absolute; top:0; left:0; right:0;
+  display:flex; justify-content:space-between; align-items:center;
+  padding:26px 44px 0 44px;
+}
+.status{
+  font-size:11px; letter-spacing:.22em; color:var(--dim);
+  display:flex; align-items:center; gap:10px; white-space:nowrap;
+}
+.status .dot{
+  width:7px; height:7px; border-radius:50%; background:var(--amber);
+  box-shadow:0 0 10px 2px rgba(255,160,70,.75);
+  animation:blink 1.7s ease-in-out infinite;
+}
+@keyframes blink{ 0%,100%{ opacity:1; } 50%{ opacity:.25; } }
+
+.ctrl{ display:flex; align-items:center; gap:14px; pointer-events:auto; }
+.fps{ font-size:11px; color:var(--ice); letter-spacing:.12em; min-width:58px; text-align:right;
+      font-variant-numeric:tabular-nums; }
+.reso{ font-size:10px; color:var(--dim); letter-spacing:.1em; }
+.seg{ display:flex; border:1px solid rgba(255,255,255,.14); }
+.seg button{
+  appearance:none; border:0; background:transparent; color:var(--dim);
+  font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+  padding:6px 12px; cursor:pointer; transition:all .25s ease;
+  border-right:1px solid rgba(255,255,255,.10);
+}
+.seg button:last-child{ border-right:0; }
+.seg button:hover{ color:var(--amber-hi); background:rgba(255,160,70,.08); }
+.seg button.on{
+  background:linear-gradient(180deg,#ffc276,#ff9440); color:#181008; font-weight:700;
+  box-shadow:0 0 16px rgba(255,150,60,.45);
+}
+.ghost{
+  appearance:none; font-family:var(--mono); font-size:11px; letter-spacing:.14em;
+  background:transparent; color:var(--dim); border:1px solid rgba(255,255,255,.14);
+  padding:6px 12px; cursor:pointer; transition:all .25s ease;
+}
+.ghost:hover{ color:var(--amber-hi); border-color:var(--line); box-shadow:0 0 14px rgba(255,150,60,.25); }
+
+/* ---------- 左侧：标题 + 遥测 + 波形 ---------- */
+.left{
+  position:absolute; left:46px; top:76px; bottom:44px;
+  display:flex; flex-direction:column; max-width:min(560px, 46vw);
+}
+.eyebrow{
+  font-size:11px; letter-spacing:.36em; color:var(--amber);
+  display:flex; align-items:center; gap:12px;
+}
+.eyebrow::before{ content:""; width:34px; height:1px; background:var(--amber); opacity:.7; }
+.title h1{
+  font-family:var(--disp); font-weight:900;
+  font-size:clamp(46px, 6.6vw, 102px); line-height:1.02;
+  letter-spacing:.045em; margin-top:14px; color:var(--ink);
+  text-shadow:0 0 26px rgba(255,150,60,.32), 0 0 70px rgba(255,120,40,.16);
+}
+.title .hollow{
+  font-family:var(--disp); font-weight:900;
+  font-size:clamp(19px, 2.4vw, 32px); letter-spacing:.46em;
+  margin-top:8px; color:transparent;
+  -webkit-text-stroke:1px rgba(255,179,92,.8);
+  text-shadow:0 0 20px rgba(255,140,50,.22);
+}
+@supports not (-webkit-text-stroke: 1px #000){
+  .title .hollow{ color:rgba(255,179,92,.6); }
+}
+.title .sub{
+  margin-top:16px; font-size:12px; letter-spacing:.14em; color:var(--dim); line-height:1.9;
+}
+.title .sub em{ font-style:normal; color:var(--ice); }
+
+/* 入场动画（载入完成后启动） */
+.title > *{ opacity:0; transform:translateY(16px); }
+body.ready .title > *{ animation:rise 1s cubic-bezier(.2,.75,.2,1) forwards; }
+body.ready .title > *:nth-child(1){ animation-delay:.15s; }
+body.ready .title > *:nth-child(2){ animation-delay:.30s; }
+body.ready .title > *:nth-child(3){ animation-delay:.45s; }
+body.ready .title > *:nth-child(4){ animation-delay:.62s; }
+@keyframes rise{ to{ opacity:1; transform:none; } }
+
+.tele{
+  margin-top:auto; align-self:flex-start;
+  min-width:330px; padding:16px 22px 14px 18px;
+  border-left:1px solid var(--line);
+  background:linear-gradient(90deg, rgba(8,10,16,.62), rgba(8,10,16,0));
+  opacity:0; transform:translateY(14px);
+}
+body.ready .tele{ animation:rise .9s .85s cubic-bezier(.2,.75,.2,1) forwards; }
+.thead{
+  font-size:10px; letter-spacing:.34em; color:var(--amber);
+  margin-bottom:11px; display:flex; align-items:center; gap:8px;
+}
+.thead::before{ content:""; width:6px; height:6px; background:var(--amber);
+  box-shadow:0 0 8px rgba(255,160,70,.8); }
+.row{
+  display:flex; justify-content:space-between; align-items:baseline; gap:26px;
+  padding:5px 0; border-bottom:1px solid rgba(255,255,255,.05);
+  transition:background .25s;
+}
+.row:last-child{ border-bottom:0; }
+.row:hover{ background:rgba(255,170,80,.05); }
+.row .k{ font-size:11px; letter-spacing:.16em; color:var(--dim); white-space:nowrap; }
+.row .k i{ font-style:normal; font-size:9px; color:rgba(255,179,92,.55); letter-spacing:.2em; margin-left:6px; }
+.row .v{
+  font-size:13px; color:var(--ice); text-align:right; white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+.row .v.tick{ animation:flash .55s ease-out; }
+@keyframes flash{
+  0%{ color:var(--amber-hi); text-shadow:0 0 14px rgba(255,190,110,.9); }
+  100%{ }
+}
+
+.wave-wrap{ margin-top:18px; opacity:0; }
+body.ready .wave-wrap{ animation:rise .9s 1.05s cubic-bezier(.2,.75,.2,1) forwards; }
+.wlabel{ font-size:9px; letter-spacing:.3em; color:var(--dim); margin-bottom:6px;
+  display:flex; align-items:center; gap:8px; }
+.wlabel::after{ content:""; flex:0 0 26px; height:1px; background:rgba(255,255,255,.15); }
+canvas#wave{ width:280px; height:46px; display:block; }
+
+/* ---------- 右侧：瞄准环 ---------- */
+.reticle{
+  position:absolute; right:56px; top:50%; transform:translateY(-50%);
+  width:190px; height:190px; opacity:0;
+}
+body.ready .reticle{ animation:fadeIn 1.4s 1.2s ease forwards; }
+@keyframes fadeIn{ to{ opacity:.85; } }
+.reticle .ring{ position:absolute; border-radius:50%; }
+.reticle .r1{ inset:0;   border:1px dashed rgba(255,179,92,.34); animation:spin 48s linear infinite; }
+.reticle .r2{ inset:26px; border:1px solid rgba(169,215,255,.30);
+  border-top-color:transparent; border-left-color:transparent;
+  animation:spin 26s linear infinite reverse; }
+.reticle .r3{ inset:58px; border:1px solid rgba(255,179,92,.28);
+  border-right-color:transparent; animation:spin 64s linear infinite; }
+.reticle .core{
+  position:absolute; left:50%; top:50%; width:4px; height:4px; margin:-2px 0 0 -2px;
+  border-radius:50%; background:var(--amber);
+  box-shadow:0 0 12px 3px rgba(255,160,70,.7); animation:blink 2.6s infinite;
+}
+.reticle::before, .reticle::after{
+  content:""; position:absolute; background:rgba(255,179,92,.22);
+}
+.reticle::before{ left:50%; top:-10px; bottom:-10px; width:1px; }
+.reticle::after{ top:50%; left:-10px; right:-10px; height:1px; }
+.reticle .rl{
+  position:absolute; left:50%; transform:translateX(-50%);
+  font-size:9px; letter-spacing:.24em; color:var(--dim); white-space:nowrap;
+}
+.reticle .rl.t{ top:-24px; } .reticle .rl.b{ bottom:-24px; }
+@keyframes spin{ to{ transform:rotate(360deg); } }
+
+/* ---------- 底部提示 ---------- */
+.hints{
+  position:absolute; right:46px; bottom:30px;
+  display:flex; gap:20px; font-size:11px; color:var(--dim); letter-spacing:.12em;
+  opacity:0;
+}
+body.ready .hints{ animation:rise .9s 1.15s cubic-bezier(.2,.75,.2,1) forwards; }
+.hints b{
+  font-weight:600; color:var(--amber); border:1px solid var(--line);
+  background:rgba(22,15,8,.55); padding:3px 8px; margin-right:7px; border-radius:3px;
+}
+
+/* ---------- 载入层 ---------- */
+#loader{
+  position:fixed; inset:0; z-index:50; background:#020308;
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px;
+  transition:opacity .9s ease, visibility .9s;
+}
+body.ready #loader{ opacity:0; visibility:hidden; }
+.lring{ width:76px; height:76px; border-radius:50%; position:relative;
+  border:1px solid rgba(255,179,92,.16); }
+.lring::before{
+  content:""; position:absolute; inset:-2px; border-radius:50%;
+  border:1px solid transparent; border-top-color:var(--amber);
+  box-shadow:0 0 22px rgba(255,160,70,.35);
+  animation:spin 1.1s linear infinite;
+}
+.lring::after{
+  content:""; position:absolute; inset:15px; border-radius:50%; background:#000;
+  box-shadow:0 0 26px 7px rgba(255,140,50,.30);
+}
+.ltxt{ font-size:12px; letter-spacing:.32em; color:var(--dim); }
+.lbar{ width:230px; height:2px; background:rgba(255,255,255,.08); }
+.lbar i{ display:block; height:100%; width:0;
+  background:linear-gradient(90deg, var(--ember), var(--amber));
+  box-shadow:0 0 12px rgba(255,160,70,.65); transition:width .35s ease; }
+
+/* ---------- 降级提示 ---------- */
+#nogl{
+  position:fixed; inset:0; z-index:60; background:#020308;
+  display:none; flex-direction:column; align-items:center; justify-content:center;
+  gap:14px; text-align:center; padding:40px;
+}
+#nogl h2{ font-family:var(--disp); font-size:22px; letter-spacing:.1em; color:var(--amber); }
+#nogl p{ font-size:12px; color:var(--dim); letter-spacing:.1em; line-height:2; max-width:520px; }
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 960px){
+  .reticle, .wave-wrap, .hints, .reso{ display:none; }
+  .top{ padding:20px 22px 0 22px; }
+  .status span.tail{ display:none; }
+  .left{ left:22px; top:64px; right:22px; max-width:none; bottom:26px; }
+  .tele{ min-width:0; width:100%; }
+  .seg button{ padding:5px 9px; }
+}
+@media (prefers-reduced-motion: reduce){
+  .sweep, .reticle .ring, .status .dot, .reticle .core{ animation:none !important; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="view"></canvas>
+<div class="scan"></div>
+<div class="sweep"></div>
+
+<div class="hud">
+  <div class="corner tl"></div><div class="corner tr"></div>
+  <div class="corner bl"></div><div class="corner br"></div>
+
+  <header class="top">
+    <div class="status">
+      <span class="dot"></span>
+      LIVE · 事件视界望远镜阵列<span class="tail"> — 站点 K-07「卡冈图雅」</span>
+    </div>
+    <div class="ctrl">
+      <span class="reso" id="reso"></span>
+      <span class="fps" id="fps">-- FPS</span>
+      <div class="seg" id="seg">
+        <button data-q="low">低</button>
+        <button data-q="medium">中</button>
+        <button data-q="high">高</button>
+        <button data-q="ultra">极致</button>
+      </div>
+      <button class="ghost" id="fs">⛶ 全屏</button>
+    </div>
+  </header>
+
+  <div class="left">
+    <section class="title">
+      <div class="eyebrow">深空观测档案 // DEEP-FIELD ARCHIVE 07</div>
+      <h1>卡冈图雅</h1>
+      <div class="hollow">GARGANTUA</div>
+      <div class="sub">
+        超大质量黑洞 · 类人马座 A* · <em>史瓦西度规</em>光线追踪<br>
+        事件视界 / 吸积盘 / 光子环 / 引力透镜 — 全相对论性渲染
+      </div>
+    </section>
+
+    <section class="tele">
+      <div class="thead">遥测 TELEMETRY</div>
+      <div class="row"><span class="k">质量 <i>MASS</i></span><span class="v">4.31×10⁶ M☉</span></div>
+      <div class="row"><span class="k">事件视界 <i>Rₛ</i></span><span class="v">1.27×10⁷ km</span></div>
+      <div class="row"><span class="k">自旋参数 <i>a/M</i></span><span class="v">0.998</span></div>
+      <div class="row"><span class="k">探测器轨道 <i>ORBIT</i></span><span class="v" id="vOrbit">—</span></div>
+      <div class="row"><span class="k">轨道倾角 <i>INCL</i></span><span class="v" id="vInc">—</span></div>
+      <div class="row"><span class="k">时间膨胀 <i>DILATION</i></span><span class="v" id="vDil">—</span></div>
+      <div class="row"><span class="k">吸积率 <i>Ṁ ACCRETION</i></span><span class="v" id="vMdot">—</span></div>
+      <div class="row"><span class="k">盘内缘温度 <i>T-INNER</i></span><span class="v" id="vTemp">—</span></div>
+    </section>
+
+    <div class="wave-wrap">
+      <div class="wlabel">引力波应变 · GW-CH 07</div>
+      <canvas id="wave" width="560" height="92"></canvas>
+    </div>
+  </div>
+
+  <aside class="reticle">
+    <div class="ring r1"></div>
+    <div class="ring r2"></div>
+    <div class="ring r3"></div>
+    <div class="core"></div>
+    <div class="rl t">光子轨道 1.5 Rₛ</div>
+    <div class="rl b">Rₛ = 1.27×10⁷ KM</div>
+  </aside>
+
+  <footer class="hints">
+    <span><b>拖拽</b>旋转视角</span>
+    <span><b>滚轮</b>缩放距离</span>
+    <span><b>双击</b>复位轨道</span>
+  </footer>
+</div>
+
+<div id="loader">
+  <div class="lring"></div>
+  <div class="ltxt" id="ltxt">初始化时空度规…</div>
+  <div class="lbar"><i id="lbar"></i></div>
+</div>
+
+<div id="nogl">
+  <h2>信号丢失 // SIGNAL LOST</h2>
+  <p id="noglmsg">当前环境不支持 WebGL 或着色器编译失败。<br>
+  观测站需要 GPU 加速以维持引力透镜实时渲染，请更换现代浏览器后重试。</p>
+</div>
+
+<script>
+/* ============================================================
+   GARGANTUA · 全相对论性黑洞渲染器
+   —— 光子在史瓦西度规下的测地线数值积分（GPU 逐像素光线追踪）
+   单位制：Rₛ = 1（史瓦西半径），G = c = 1，M = 0.5
+   光子运动方程：d²x/dλ² = -1.5 · h² · x / r⁵   （h 为守恒角动量）
+   ============================================================ */
+(function () {
+"use strict";
+
+const $ = id => document.getElementById(id);
+
+/* ---------------- 着色器 ---------------- */
+const VERT = `attribute vec2 a;void main(){gl_Position=vec4(a,0.,1.);}`;
+
+const FRAG = `
+precision highp float;
+
+uniform vec2  uRes;
+uniform float uTime;
+uniform vec3  uCam, uRight, uUp, uFwd;
+
+const float PI    = 3.141592653589793;
+const float R_IN  = 2.6;    /* 吸积盘内缘（ISCO 附近） */
+const float R_OUT = 11.5;   /* 吸积盘外缘 */
+const float FOCAL = 1.62;   /* 相机焦距（fov 约 63 度） */
+const int   STEPS = __STEPS__;
+
+/* ---------- 哈希与噪声 ---------- */
+float hash12(vec2 p){
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+float hash13(vec3 p){
+  p = fract(p * 0.1031);
+  p += dot(p, p.zyx + 31.32);
+  return fract((p.x + p.y) * p.z);
+}
+float vnoise(vec3 p){
+  vec3 i = floor(p), f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  float n000 = hash13(i);
+  float n100 = hash13(i + vec3(1.,0.,0.));
+  float n010 = hash13(i + vec3(0.,1.,0.));
+  float n110 = hash13(i + vec3(1.,1.,0.));
+  float n001 = hash13(i + vec3(0.,0.,1.));
+  float n101 = hash13(i + vec3(1.,0.,1.));
+  float n011 = hash13(i + vec3(0.,1.,1.));
+  float n111 = hash13(i + vec3(1.,1.,1.));
+  return mix(
+    mix(mix(n000,n100,f.x), mix(n010,n110,f.x), f.y),
+    mix(mix(n001,n101,f.x), mix(n011,n111,f.x), f.y), f.z);
+}
+float fbm(vec3 p){
+  float s = 0.0, a = 0.5;
+  for (int i = 0; i < 5; i++){
+    s += a * vnoise(p);
+    p = p * 2.03 + vec3(19.7, 7.3, 23.1);
+    a *= 0.5;
+  }
+  return s;
+}
+
+/* ---------- 星空（三层 + 银河带 + 河外星系） ---------- */
+vec3 starLayer(vec3 d, float cells, float boost){
+  vec3 p  = d * cells;
+  vec3 id = floor(p);
+  vec3 f  = fract(p) - 0.5;
+  vec3 sp = vec3(hash13(id + 1.7), hash13(id + 9.1), hash13(id + 5.3)) - 0.5;
+  float dist = length(f - sp * 0.82);
+  float h  = hash13(id);
+  float m  = 1.0 - smoothstep(0.02, 0.15, dist);
+  float tw = 0.65 + 0.35 * sin(uTime * (0.6 + h * 3.0) + h * 61.7);
+  float b  = pow(h, 24.0) * boost * tw;
+  vec3 tint = mix(vec3(0.62,0.74,1.0), vec3(1.0,0.83,0.62), step(0.5, hash13(id + 3.3)));
+  return tint * m * b;
+}
+vec3 sky(vec3 d){
+  vec3 col = vec3(0.008, 0.010, 0.020);           /* 深空底色 */
+  /* 银河带与尘埃暗带 */
+  vec3 nb = normalize(vec3(0.42, 0.86, 0.28));
+  float hgt  = dot(d, nb);
+  float band = exp(-hgt * hgt * 5.5);
+  float dustA = fbm(d * 3.2 + vec3(3.7, 8.2, 1.1));
+  float dustB = fbm(d * 6.8 + vec3(13.7, 2.9, 7.7));
+  vec3 bandCol = mix(vec3(0.30,0.22,0.38), vec3(0.85,0.55,0.32), smoothstep(0.35,0.75,dustA));
+  float lane = smoothstep(0.62, 0.30, dustB);
+  col += bandCol * band * (0.10 + 0.30 * dustB) * lane * 1.4;
+  /* 弥漫星云：青蓝 + 洋红两叶 */
+  float n1 = fbm(d * 2.1 + vec3(31.4, 17.7, 3.9));
+  col += vec3(0.045,0.10,0.16) * pow(max(n1 - 0.25, 0.0) * 1.6, 1.8);
+  float n2 = fbm(d * 2.7 + vec3(7.7, 41.3, 29.1));
+  col += vec3(0.14,0.05,0.12) * pow(max(n2 - 0.35, 0.0) * 1.7, 2.0);
+  /* 星层 */
+  col += starLayer(d,  24.0, 2.2);
+  col += starLayer(d,  52.0, 1.5);
+  col += starLayer(d, 110.0, 0.9);
+  /* 远方星系 */
+  vec3 gd = normalize(vec3(-0.55, 0.30, -0.72));
+  float g = max(dot(d, gd), 0.0);
+  col += vec3(0.9,0.75,0.55) * (pow(g, 500.0) * 1.6 + pow(g, 60.0) * 0.10);
+  return col;
+}
+
+/* ---------- 黑体色温渐变（冷到热） ---------- */
+vec3 bb(float t){
+  vec3 c;
+  if (t < 0.33)      c = mix(vec3(0.36,0.05,0.008), vec3(0.92,0.25,0.03), t / 0.33);
+  else if (t < 0.66) c = mix(vec3(0.92,0.25,0.03), vec3(1.00,0.72,0.25), (t - 0.33) / 0.33);
+  else               c = mix(vec3(1.00,0.72,0.25), vec3(1.00,0.97,0.88), (t - 0.66) / 0.34);
+  return c;
+}
+
+/* ---------- 吸积盘：开普勒差旋 + 多普勒集束 + 引力红移 ---------- */
+vec4 disk(vec3 hp, vec3 rd){
+  float r  = length(hp.xz);
+  float rn = clamp((r - R_IN) / (R_OUT - R_IN), 0.0, 1.0);
+  float ang = atan(hp.z, hp.x);
+  /* 差速旋转：角速度 正比于 r^-3/2，图案随物质流动 */
+  float omega = 1.35 / (r * sqrt(r));
+  float sw = ang - uTime * omega;
+  vec2 rp = vec2(cos(sw), sin(sw)) * r;
+  float n1 = vnoise(vec3(rp * 1.35, r * 1.9));
+  float n2 = vnoise(vec3(rp * 3.8 + vec2(50.0, 20.0), r * 5.2));
+  float n3 = vnoise(vec3(rp * 8.5, r * 11.0 + uTime * 0.15));
+  float tex = n1 * 0.50 + n2 * 0.32 + n3 * 0.18;
+  /* 旋臂 */
+  float arm = 0.5 + 0.5 * sin(sw * 2.0 + r * 2.6 + n1 * 3.5);
+  float edgeIn  = smoothstep(0.0, 0.10, rn);
+  float edgeOut = 1.0 - smoothstep(0.55, 1.0, rn);
+  float dens = edgeIn * edgeOut * (0.30 + 0.70 * tex) * (0.72 + 0.28 * arm);
+  float bright = 3.4 * pow(R_IN / r, 2.1);
+  float temp   = pow(1.0 - rn, 1.35) * (0.88 + 0.24 * tex);
+  /* 相对论效应：轨道速度 beta = sqrt(M/r)，M = 0.5 */
+  vec3  tdir  = vec3(-hp.z, 0.0, hp.x) / r;
+  float beta  = sqrt(0.5 / r);
+  float gamma = inversesqrt(max(1.0 - beta * beta, 0.001));
+  float mu    = dot(tdir, rd);                    /* rd：光子离相机方向 */
+  float dop   = 1.0 / (gamma * (1.0 + beta * mu));/* 多普勒因子 */
+  float gsh   = sqrt(max(1.0 - 1.0 / r, 0.0));    /* 引力红移 */
+  float g     = dop * gsh;
+  temp   = clamp(temp * (0.55 + 0.60 * g), 0.0, 1.0);
+  bright *= g * g * g;                            /* 相对论性集束 */
+  vec3 col = bb(temp) * bright * dens;
+  float alpha = clamp(dens * 1.9, 0.0, 1.0);
+  return vec4(col, alpha);
+}
+
+/* ---------- ACES 色调映射 ---------- */
+vec3 aces(vec3 x){
+  return clamp((x * (2.51 * x + 0.03)) / (x * (2.43 * x + 0.59) + 0.14), 0.0, 1.0);
+}
+
+void main(){
+  vec2 uv = (2.0 * gl_FragCoord.xy - uRes) / uRes.y;
+  vec3 rd = normalize(uRight * uv.x + uUp * uv.y + uFwd * FOCAL);
+  vec3 ro = uCam;
+
+  vec3 p = ro, v = rd;
+  float h2 = dot(cross(p, v), cross(p, v));  /* 守恒量 h*h = |x cross v|^2 */
+
+  vec3  col = vec3(0.0);
+  float trans = 1.0;
+  float minR = 1e9;
+  vec3  escDir = rd;
+  int hit = 0;                               /* 0 未定 / 1 俘获 / 2 逃逸 */
+
+  for (int i = 0; i < STEPS; i++){
+    float r2 = dot(p, p);
+    float r  = sqrt(r2);
+    minR = min(minR, r);
+    if (r < 1.0){ hit = 1; break; }                        /* 事件视界 */
+    if (r2 > 3600.0 && dot(p, v) > 0.0){ hit = 2; escDir = normalize(v); break; }
+    /* 自适应步长：光子球附近细化 */
+    float dt = clamp(0.085 * (r - 0.72), 0.02, 2.4);
+    vec3 acc = (-1.5 * h2 / (r2 * r2 * r)) * p;            /* 测地线弯曲 */
+    v += acc * dt;
+    vec3 np = p + v * dt;
+    /* 吸积盘交点（允许穿越多次，形成光子环多重成像） */
+    if (p.y * np.y < 0.0){
+      float f = p.y / (p.y - np.y);
+      vec3 hp = p + (np - p) * f;
+      float hr2 = hp.x * hp.x + hp.z * hp.z;
+      if (hr2 > R_IN * R_IN && hr2 < R_OUT * R_OUT){
+        vec4 dc = disk(hp, normalize(v));
+        col  += trans * dc.rgb;
+        trans *= 1.0 - dc.a;
+      }
+    }
+    p = np;
+    if (trans < 0.012) break;
+  }
+
+  if (hit == 2)      col += trans * sky(escDir);
+  else if (hit == 0 && dot(p, v) > 0.0) col += trans * sky(normalize(v));
+
+  /* 光子球软晕 */
+  if (hit != 1){
+    float d15 = minR - 1.5;
+    col += vec3(1.0, 0.55, 0.20) * exp(-d15 * d15 * 4.5) * 0.085 * trans;
+  }
+
+  /* 调色：曝光 - ACES - Gamma - 暗角 - 胶片颗粒 */
+  col *= 1.25;
+  col = aces(col);
+  col = pow(col, vec3(0.4545));
+  vec2 q = gl_FragCoord.xy / uRes;
+  col *= 1.0 - 0.30 * pow(distance(q, vec2(0.5)) * 1.35, 2.6);
+  col += (hash12(gl_FragCoord.xy + fract(uTime) * 61.7) - 0.5) * 0.014;
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+/* ---------------- 画质预设 ---------------- */
+const QUALITY = {
+  low:    { h: 460,  steps: 150 },
+  medium: { h: 680,  steps: 200 },
+  high:   { h: 920,  steps: 260 },
+  ultra:  { h: 1400, steps: 330 },
+};
+const coarse = matchMedia("(pointer:coarse)").matches;
+const mem = navigator.deviceMemory || 8;
+let quality = "high";
+if (coarse || mem <= 4) quality = "medium";
+if (coarse && mem <= 4) quality = "low";
+const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------------- WebGL 初始化 ---------------- */
+const canvas = $("view");
+const GL_OPTS = {
+  alpha:false, antialias:false, depth:false, stencil:false,
+  powerPreference:"high-performance", preserveDrawingBuffer:false
+};
+const gl = canvas.getContext("webgl", GL_OPTS) || canvas.getContext("experimental-webgl", GL_OPTS);
+function fail(msg){
+  if (msg) $("noglmsg").innerHTML = msg;
+  $("nogl").style.display = "flex";
+  document.body.classList.add("ready");
+}
+if (!gl){ fail(); return; }
+
+canvas.addEventListener("webglcontextlost", e => {
+  e.preventDefault();
+  fail("渲染上下文丢失 // CONTEXT LOST。<br>GPU 资源被回收，请刷新页面重新建立观测链路。");
+});
+
+function compile(type, src){
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)){
+    console.error(gl.getShaderInfoLog(s));
+    fail("着色器编译失败 // SHADER COMPILE ERROR。<br>详情已记录至控制台。");
+    return null;
+  }
+  return s;
+}
+function buildProgram(steps){
+  const vs = compile(gl.VERTEX_SHADER, VERT);
+  const fs = compile(gl.FRAGMENT_SHADER, FRAG.replace("__STEPS__", String(steps)));
+  if (!vs || !fs) return null;
+  const prog = gl.createProgram();
+  gl.attachShader(prog, vs); gl.attachShader(prog, fs);
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)){
+    console.error(gl.getProgramInfoLog(prog));
+    fail("着色器链接失败 // LINK ERROR。");
+    return null;
+  }
+  gl.deleteShader(vs); gl.deleteShader(fs);
+  return {
+    prog,
+    a:     gl.getAttribLocation(prog, "a"),
+    uRes:  gl.getUniformLocation(prog, "uRes"),
+    uTime: gl.getUniformLocation(prog, "uTime"),
+    uCam:  gl.getUniformLocation(prog, "uCam"),
+    uR:    gl.getUniformLocation(prog, "uRight"),
+    uU:    gl.getUniformLocation(prog, "uUp"),
+    uF:    gl.getUniformLocation(prog, "uFwd"),
+  };
+}
+
+const vbo = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 3,-1, -1,3]), gl.STATIC_DRAW);
+gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
+
+let P = buildProgram(QUALITY[quality].steps);
+if (!P) return;
+
+/* ---------------- 尺寸 ---------------- */
+function resize(){
+  const q = QUALITY[quality];
+  let H = Math.min(q.h, 1600);
+  let W = Math.round(H * innerWidth / innerHeight);
+  if (W > 2800){ W = 2800; H = Math.round(W * innerHeight / innerWidth); }
+  canvas.width = W; canvas.height = H;
+  gl.viewport(0, 0, W, H);
+  $("reso").textContent = W + "×" + H;
+}
+addEventListener("resize", resize);
+
+/* ---------------- 相机与交互 ---------------- */
+const DEF = { yaw: 0.35, pitch: 0.145, dist: 16.5 };
+const PITCH_MIN = -1.35, PITCH_MAX = 1.35, DIST_MIN = 3.3, DIST_MAX = 55;
+let yaw = DEF.yaw, pitch = DEF.pitch, dist = DEF.dist;
+let yawT = yaw, pitchT = pitch, distT = dist;
+let lastInteract = performance.now();
+
+function interact(){ lastInteract = performance.now(); }
+const clamp = (x,a,b) => Math.min(b, Math.max(a, x));
+
+const pointers = new Map();
+let pinchPrev = 0;
+
+canvas.addEventListener("pointerdown", e => {
+  canvas.setPointerCapture(e.pointerId);
+  pointers.set(e.pointerId, { x:e.clientX, y:e.clientY, btn:e.button });
+  canvas.classList.add("dragging");
+  interact();
+});
+canvas.addEventListener("pointermove", e => {
+  if (!pointers.has(e.pointerId)) return;
+  const prev = pointers.get(e.pointerId);
+  const dx = e.clientX - prev.x, dy = e.clientY - prev.y;
+  pointers.set(e.pointerId, { x:e.clientX, y:e.clientY, btn:prev.btn });
+  interact();
+
+  if (pointers.size === 2){                       /* 双指捏合缩放 */
+    const pts = [...pointers.values()];
+    const d = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    if (pinchPrev > 0) distT = clamp(distT * pinchPrev / d, DIST_MIN, DIST_MAX);
+    pinchPrev = d;
+    return;
+  }
+  if (prev.btn === 2){                            /* 右键拖拽 = 缩放 */
+    distT = clamp(distT * Math.exp(dy * 0.004), DIST_MIN, DIST_MAX);
+  } else {                                        /* 左键拖拽 = 轨道旋转 */
+    yawT  -= dx * 0.005;
+    pitchT = clamp(pitchT + dy * 0.005, PITCH_MIN, PITCH_MAX);
+  }
+});
+function endPointer(e){
+  pointers.delete(e.pointerId);
+  pinchPrev = 0;
+  if (pointers.size === 0) canvas.classList.remove("dragging");
+}
+canvas.addEventListener("pointerup", endPointer);
+canvas.addEventListener("pointercancel", endPointer);
+canvas.addEventListener("contextmenu", e => e.preventDefault());
+
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  distT = clamp(distT * Math.exp(e.deltaY * 0.0012), DIST_MIN, DIST_MAX);
+  interact();
+}, { passive:false });
+
+canvas.addEventListener("dblclick", () => {
+  yawT = DEF.yaw; pitchT = DEF.pitch; distT = DEF.dist; interact();
+});
+
+addEventListener("keydown", e => {
+  switch (e.key){
+    case "ArrowLeft":  yawT += 0.12; break;
+    case "ArrowRight": yawT -= 0.12; break;
+    case "ArrowUp":    pitchT = clamp(pitchT + 0.08, PITCH_MIN, PITCH_MAX); break;
+    case "ArrowDown":  pitchT = clamp(pitchT - 0.08, PITCH_MIN, PITCH_MAX); break;
+    case "=": case "+": distT = clamp(distT * 0.88, DIST_MIN, DIST_MAX); break;
+    case "-":           distT = clamp(distT * 1.14, DIST_MIN, DIST_MAX); break;
+    case "r": case "R": yawT = DEF.yaw; pitchT = DEF.pitch; distT = DEF.dist; break;
+    case "f": case "F": toggleFS(); break;
+    default: return;
+  }
+  e.preventDefault(); interact();
+});
+
+/* ---------------- 画质切换 ---------------- */
+function markSeg(){
+  [...$("seg").children].forEach(b => b.classList.toggle("on", b.dataset.q === quality));
+}
+$("seg").addEventListener("click", e => {
+  const q = e.target.dataset && e.target.dataset.q;
+  if (!q || q === quality) return;
+  quality = q;
+  const np = buildProgram(QUALITY[q].steps);
+  if (np){ if (P) gl.deleteProgram(P.prog); P = np; }
+  markSeg(); resize(); interact();
+});
+markSeg();
+
+/* ---------------- 全屏 ---------------- */
+function toggleFS(){
+  if (document.fullscreenElement) document.exitFullscreen();
+  else if (document.documentElement.requestFullscreen)
+    document.documentElement.requestFullscreen();
+}
+$("fs").addEventListener("click", toggleFS);
+
+/* ---------------- 遥测读数 ---------------- */
+const SUP = {"0":"⁰","1":"¹","2":"²","3":"³","4":"⁴","5":"⁵","6":"⁶","7":"⁷","8":"⁸","9":"⁹","-":"⁻"};
+function sci(x, d){
+  d = d === undefined ? 2 : d;
+  const e = Math.floor(Math.log10(Math.abs(x)));
+  const m = x / Math.pow(10, e);
+  return m.toFixed(d) + "×10" + String(e).split("").map(c => SUP[c] || c).join("");
+}
+function setVal(el, txt){
+  if (el.textContent === txt) return;
+  el.textContent = txt;
+  el.classList.remove("tick"); void el.offsetWidth; el.classList.add("tick");
+}
+const RS_KM = 1.27e7;
+function updateHUD(now){
+  setVal($("vOrbit"), dist.toFixed(1) + " Rₛ · " + sci(dist * RS_KM) + " km");
+  const deg = pitch * 180 / Math.PI;
+  setVal($("vInc"), (deg >= 0 ? "+" : "") + deg.toFixed(1) + "°");
+  setVal($("vDil"), "×" + (1 / Math.sqrt(Math.max(1 - 1 / dist, 1e-6))).toFixed(4));
+  setVal($("vMdot"), sci(3.2e-8 * (1 + 0.06 * Math.sin(now * 0.00041 + 2.1))) + " M☉/yr");
+  setVal($("vTemp"), sci(5.4e7 * (1 + 0.04 * Math.sin(now * 0.00063) + 0.02 * Math.sin(now * 0.0017))) + " K");
+}
+
+/* ---------------- 引力波示波器 ---------------- */
+const wave = $("wave"), wctx = wave.getContext("2d");
+function drawWave(t){
+  const w = wave.width, h = wave.height;
+  wctx.clearRect(0, 0, w, h);
+  wctx.strokeStyle = "rgba(255,255,255,.10)";
+  wctx.lineWidth = 1;
+  wctx.beginPath(); wctx.moveTo(0, h/2); wctx.lineTo(w, h/2); wctx.stroke();
+  wctx.beginPath();
+  for (let x = 0; x <= w; x += 2){
+    const u = x / w, env = Math.sin(u * Math.PI);
+    const y = h/2 + env * (
+      Math.sin(u * 22 + t * 2.4) * 10 +
+      Math.sin(u * 47 - t * 3.7) * 6 +
+      Math.sin(u * 9  + t * 1.1) * 8);
+    x === 0 ? wctx.moveTo(x, y) : wctx.lineTo(x, y);
+  }
+  wctx.strokeStyle = "rgba(255,170,80,.85)";
+  wctx.lineWidth = 1.6;
+  wctx.shadowColor = "rgba(255,150,60,.6)";
+  wctx.shadowBlur = 8;
+  wctx.stroke();
+  wctx.shadowBlur = 0;
+}
+
+/* ---------------- 主循环 ---------------- */
+let last = performance.now(), frames = 0, fpsT = last, hudT = 0, drawn = 0;
+
+function frame(now){
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - last) / 1000, 0.05);
+  last = now;
+
+  /* 闲置自动环绕 */
+  if (!reducedMotion && now - lastInteract > 5000) yawT += dt * 0.05;
+
+  /* 阻尼趋近 */
+  const k = 1 - Math.exp(-dt * 7);
+  yaw   += (yawT   - yaw)   * k;
+  pitch += (pitchT - pitch) * k;
+  dist  += (distT  - dist)  * k;
+
+  /* 相机基向量 */
+  const cp = Math.cos(pitch), sp = Math.sin(pitch);
+  const cam = [cp * Math.sin(yaw) * dist, sp * dist, cp * Math.cos(yaw) * dist];
+  const inv = 1 / Math.hypot(cam[0], cam[1], cam[2]);
+  const fwd = [-cam[0]*inv, -cam[1]*inv, -cam[2]*inv];
+  let rx = fwd[2], ry = 0, rz = -fwd[0];                 /* cross(fwd, up0) */
+  const rl = 1 / Math.hypot(rx, ry, rz); rx *= rl; rz *= rl;
+  const up = [ry*fwd[2] - rz*fwd[1], rz*fwd[0] - rx*fwd[2], rx*fwd[1] - ry*fwd[0]];
+
+  gl.useProgram(P.prog);
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  gl.enableVertexAttribArray(P.a);
+  gl.vertexAttribPointer(P.a, 2, gl.FLOAT, false, 0, 0);
+  gl.uniform2f(P.uRes, canvas.width, canvas.height);
+  gl.uniform1f(P.uTime, (now / 1000) % 7200);
+  gl.uniform3fv(P.uCam, cam);
+  gl.uniform3fv(P.uR, [rx, ry, rz]);
+  gl.uniform3fv(P.uU, up);
+  gl.uniform3fv(P.uF, fwd);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  if (drawn < 3) drawn++;
+
+  /* FPS */
+  frames++;
+  if (now - fpsT > 500){
+    $("fps").textContent = Math.round(frames * 1000 / (now - fpsT)) + " FPS";
+    frames = 0; fpsT = now;
+  }
+  /* 遥测 4Hz */
+  if (now - hudT > 250){ updateHUD(now); hudT = now; }
+  drawWave(now / 1000);
+}
+
+/* ---------------- 载入序列 ---------------- */
+resize();
+const stages = [
+  "初始化时空度规…", "编译引力透镜着色器…", "铺设吸积盘湍流…",
+  "对齐恒星参考架…", "同步事件视界时钟…"
+];
+let si = 0;
+const stageTimer = setInterval(() => {
+  si = Math.min(si + 1, stages.length - 1);
+  $("ltxt").textContent = stages[si];
+  $("lbar").style.width = ((si + 1) / stages.length * 100) + "%";
+}, 320);
+$("lbar").style.width = "12%";
+
+function ready(){
+  if (drawn >= 2){
+    clearInterval(stageTimer);
+    $("lbar").style.width = "100%";
+    setTimeout(() => document.body.classList.add("ready"), 350);
+  } else setTimeout(ready, 120);
+}
+setTimeout(ready, 1200);
+
+requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

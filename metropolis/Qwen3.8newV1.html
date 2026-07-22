@@ -1,0 +1,1290 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>无尽都市 · 程序化城市实时渲染器</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:100%;height:100%;overflow:hidden;background:#000;font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif}
+#view{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:grab}
+#view.drag{cursor:grabbing}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;mix-blend-mode:screen}
+#panel{position:fixed;top:12px;right:12px;width:302px;max-height:calc(100vh - 24px);overflow-y:auto;overflow-x:hidden;
+ background:rgba(10,13,20,.82);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.09);border-radius:14px;
+ color:#dfe6f2;font-size:12px;box-shadow:0 10px 40px rgba(0,0,0,.55);transition:transform .3s,opacity .3s;z-index:10}
+#panel.hidden{transform:translateX(330px);opacity:0;pointer-events:none}
+#panel::-webkit-scrollbar{width:6px}#panel::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px}
+#phead{position:sticky;top:0;background:rgba(10,13,20,.95);backdrop-filter:blur(14px);padding:12px 14px 10px;border-bottom:1px solid rgba(255,255,255,.08);z-index:2}
+#phead h1{font-size:14px;font-weight:700;letter-spacing:1px;background:linear-gradient(90deg,#7dd3fc,#c084fc,#fb7185);-webkit-background-clip:text;background-clip:text;color:transparent}
+#phead .sub{font-size:10px;color:#8b96ab;margin-top:2px}
+#stats{display:flex;gap:8px;margin-top:8px;font-size:10px;color:#9fb0c8}
+#stats b{color:#7dd3fc;font-weight:600}
+#presets{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+#presets button{flex:1 1 30%;padding:5px 2px;font-size:10px;color:#cfe0f4;background:rgba(125,211,252,.1);border:1px solid rgba(125,211,252,.25);border-radius:7px;cursor:pointer;transition:.15s}
+#presets button:hover{background:rgba(125,211,252,.25)}
+.sec{border-bottom:1px solid rgba(255,255,255,.06)}
+.sec>h3{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;font-size:11px;font-weight:600;color:#aebad0;cursor:pointer;user-select:none;letter-spacing:.5px}
+.sec>h3:hover{color:#fff}
+.sec>h3 span{transition:transform .2s;font-size:9px}
+.sec.closed>h3 span{transform:rotate(-90deg)}
+.sec .body{padding:2px 14px 10px;display:grid;gap:7px}
+.sec.closed .body{display:none}
+.ctl{display:grid;grid-template-columns:76px 1fr 44px;align-items:center;gap:8px}
+.ctl label{color:#93a1b8;font-size:11px;white-space:nowrap}
+.ctl .val{text-align:right;color:#7dd3fc;font-size:10px;font-variant-numeric:tabular-nums}
+.ctl input[type=range]{-webkit-appearance:none;width:100%;height:3px;border-radius:2px;background:rgba(255,255,255,.14);outline:none}
+.ctl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:11px;height:11px;border-radius:50%;background:#7dd3fc;cursor:pointer;box-shadow:0 0 6px rgba(125,211,252,.6)}
+.ctl input[type=range]::-moz-range-thumb{width:11px;height:11px;border:none;border-radius:50%;background:#7dd3fc;cursor:pointer}
+.ctl select{background:rgba(255,255,255,.08);color:#dfe6f2;border:1px solid rgba(255,255,255,.12);border-radius:6px;padding:3px 4px;font-size:11px;outline:none;grid-column:2/4}
+.tgl{display:flex;align-items:center;gap:8px;cursor:pointer;padding:1px 0}
+.tgl input{display:none}
+.tgl .sw{width:28px;height:15px;border-radius:8px;background:rgba(255,255,255,.15);position:relative;transition:.2s;flex:none}
+.tgl .sw::after{content:'';position:absolute;top:2px;left:2px;width:11px;height:11px;border-radius:50%;background:#8b96ab;transition:.2s}
+.tgl input:checked+.sw{background:rgba(125,211,252,.55)}
+.tgl input:checked+.sw::after{left:15px;background:#fff}
+.tgl em{font-style:normal;color:#93a1b8;font-size:11px}
+.btn{padding:7px 10px;font-size:11px;color:#0a0d14;font-weight:700;background:linear-gradient(90deg,#7dd3fc,#a5b4fc);border:none;border-radius:8px;cursor:pointer;letter-spacing:1px}
+.btn:hover{filter:brightness(1.12)}
+.btnrow{display:flex;gap:6px}.btnrow .btn{flex:1}
+.btn.ghost{background:rgba(255,255,255,.1);color:#cfe0f4;font-weight:600}
+#hint{position:fixed;left:14px;bottom:12px;color:rgba(255,255,255,.55);font-size:11px;pointer-events:none;text-shadow:0 1px 3px #000;z-index:9;line-height:1.7}
+#clock{position:fixed;left:14px;top:12px;color:rgba(255,255,255,.85);font-size:13px;font-weight:600;pointer-events:none;text-shadow:0 1px 4px #000;z-index:9;letter-spacing:1px}
+#err{position:fixed;inset:0;display:none;place-items:center;background:#0a0d14;color:#fb7185;font-size:14px;z-index:99;padding:40px;text-align:center;line-height:2}
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="flash"></div>
+<div id="clock"></div>
+<div id="hint">拖拽旋转 · 滚轮缩放 · WASD/方向键平移 · Q/E升降 · 空格自动环绕 · H 面板 · P 暂停时间</div>
+<div id="panel"></div>
+<div id="err"></div>
+<script>
+"use strict";
+/* ================= 1. 参数系统（60+ 项独立可调） ================= */
+const GROUPS=[["city","城市形态"],["sky","时间与天空"],["weather","天气系统"],["light","光照与阴影"],["night","夜景与交通"],["post","后期与调色"],["cam","相机与性能"]];
+const DEFS=[
+{k:'seed',g:'city',t:'btn',label:'🎲 生成新城市'},
+{k:'density',g:'city',t:'r',label:'建筑密度',min:.15,max:1,st:.01,v:.8},
+{k:'heightScale',g:'city',t:'r',label:'高度缩放',min:.3,max:3,st:.05,v:1},
+{k:'heightVar',g:'city',t:'r',label:'高度差异',min:0,max:1,st:.01,v:.65},
+{k:'downtown',g:'city',t:'r',label:'中心聚集',min:0,max:1,st:.01,v:.6},
+{k:'blockSize',g:'city',t:'r',label:'街区大小',min:26,max:90,st:1,v:46},
+{k:'roadWidth',g:'city',t:'r',label:'道路宽度',min:6,max:26,st:.5,v:12},
+{k:'hue',g:'city',t:'r',label:'建筑色相',min:0,max:1,st:.01,v:.58},
+{k:'sat',g:'city',t:'r',label:'色彩饱和',min:0,max:1,st:.01,v:.3},
+{k:'bright',g:'city',t:'r',label:'立面明度',min:.4,max:1.6,st:.02,v:1},
+{k:'glass',g:'city',t:'r',label:'玻璃幕墙',min:0,max:1,st:.01,v:.45},
+{k:'winDens',g:'city',t:'r',label:'窗户密度',min:.4,max:1.6,st:.01,v:1},
+{k:'podium',g:'city',t:'r',label:'裙楼概率',min:0,max:1,st:.01,v:.4},
+{k:'antenna',g:'city',t:'r',label:'天线概率',min:0,max:1,st:.01,v:.4},
+{k:'roofDet',g:'city',t:'r',label:'屋顶细节',min:0,max:1,st:.01,v:.7},
+{k:'neonDens',g:'city',t:'r',label:'霓虹密度',min:0,max:1,st:.01,v:.55},
+{k:'rotJitter',g:'city',t:'r',label:'朝向抖动',min:0,max:1,st:.01,v:.15},
+{k:'drawDist',g:'city',t:'r',label:'绘制距离',min:300,max:2400,st:50,v:1200},
+{k:'lodDist',g:'city',t:'r',label:'LOD 距离',min:200,max:1500,st:25,v:600},
+{k:'time',g:'sky',t:'r',label:'时刻 (时)',min:0,max:24,st:.05,v:17.4},
+{k:'timeSpeed',g:'sky',t:'r',label:'时间流速',min:0,max:600,st:5,v:20},
+{k:'paused',g:'sky',t:'b',label:'暂停时间',v:false},
+{k:'season',g:'sky',t:'r',label:'季节赤纬',min:-23.5,max:23.5,st:.5,v:12},
+{k:'turbidity',g:'sky',t:'r',label:'大气浑浊',min:1,max:8,st:.1,v:2.6},
+{k:'sunBoost',g:'sky',t:'r',label:'太阳强度',min:.2,max:3,st:.05,v:1.2},
+{k:'cloudCover',g:'sky',t:'r',label:'云量',min:0,max:1,st:.01,v:.28},
+{k:'cloudScale',g:'sky',t:'r',label:'云尺度',min:.3,max:3,st:.05,v:1},
+{k:'cloudSpeed',g:'sky',t:'r',label:'云速',min:0,max:3,st:.05,v:.4},
+{k:'cloudH',g:'sky',t:'r',label:'云层高度',min:600,max:4000,st:50,v:1800},
+{k:'stars',g:'sky',t:'r',label:'星光强度',min:0,max:2,st:.05,v:1},
+{k:'moonSize',g:'sky',t:'r',label:'月亮大小',min:.3,max:2,st:.05,v:1},
+{k:'rain',g:'weather',t:'r',label:'降雨强度',min:0,max:1,st:.01,v:0},
+{k:'snow',g:'weather',t:'r',label:'降雪强度',min:0,max:1,st:.01,v:0},
+{k:'windX',g:'weather',t:'r',label:'风向 X',min:-1,max:1,st:.05,v:.3},
+{k:'windZ',g:'weather',t:'r',label:'风向 Z',min:-1,max:1,st:.05,v:.1},
+{k:'fog',g:'weather',t:'r',label:'雾浓度',min:0,max:2,st:.02,v:.35},
+{k:'fogH',g:'weather',t:'r',label:'雾层高度',min:20,max:500,st:5,v:140},
+{k:'wet',g:'weather',t:'r',label:'地面湿度',min:0,max:1,st:.01,v:0},
+{k:'lightning',g:'weather',t:'r',label:'闪电频率',min:0,max:1,st:.01,v:0},
+{k:'sunInt',g:'light',t:'r',label:'直射光强',min:0,max:3,st:.05,v:1.15},
+{k:'ambient',g:'light',t:'r',label:'天空环境',min:0,max:2,st:.05,v:1},
+{k:'bounce',g:'light',t:'r',label:'地面反弹',min:0,max:1,st:.01,v:.35},
+{k:'shadowRes',g:'light',t:'s',label:'阴影分辨率',opts:['1024','2048','4096'],v:1},
+{k:'shadowSoft',g:'light',t:'r',label:'阴影柔和',min:0,max:3,st:.05,v:1},
+{k:'shadowDist',g:'light',t:'r',label:'阴影距离',min:80,max:600,st:10,v:260},
+{k:'acne',g:'light',t:'r',label:'阴影偏移',min:0,max:4,st:.05,v:1.2},
+{k:'winGlow',g:'night',t:'r',label:'窗户灯光',min:0,max:3,st:.05,v:1.3},
+{k:'litProb',g:'night',t:'r',label:'亮灯比例',min:0,max:1,st:.01,v:.55},
+{k:'warmth',g:'night',t:'r',label:'灯光色温',min:0,max:1,st:.01,v:.6},
+{k:'streetInt',g:'night',t:'r',label:'路灯强度',min:0,max:3,st:.05,v:1.4},
+{k:'neonInt',g:'night',t:'r',label:'霓虹强度',min:0,max:3,st:.05,v:1.5},
+{k:'carDens',g:'night',t:'r',label:'车流密度',min:0,max:1,st:.01,v:.55},
+{k:'carSpeed',g:'night',t:'r',label:'车速倍率',min:0,max:3,st:.05,v:1},
+{k:'exposure',g:'post',t:'r',label:'曝光',min:.2,max:3,st:.02,v:1.05},
+{k:'tonemap',g:'post',t:'s',label:'色调映射',opts:['ACES','Reinhard','Uncharted2','线性'],v:0},
+{k:'saturation',g:'post',t:'r',label:'饱和度',min:0,max:2,st:.02,v:1},
+{k:'contrast',g:'post',t:'r',label:'对比度',min:.5,max:2,st:.02,v:1},
+{k:'tint',g:'post',t:'r',label:'色温偏移',min:-1,max:1,st:.02,v:0},
+{k:'bloomInt',g:'post',t:'r',label:'泛光强度',min:0,max:3,st:.05,v:.9},
+{k:'bloomThr',g:'post',t:'r',label:'泛光阈值',min:0,max:3,st:.05,v:.85},
+{k:'bloomRad',g:'post',t:'r',label:'泛光半径',min:.2,max:3,st:.05,v:1.2},
+{k:'vignette',g:'post',t:'r',label:'暗角',min:0,max:1,st:.01,v:.32},
+{k:'grain',g:'post',t:'r',label:'胶片颗粒',min:0,max:1,st:.01,v:.18},
+{k:'chroma',g:'post',t:'r',label:'色差',min:0,max:2,st:.02,v:.35},
+{k:'fxaa',g:'post',t:'b',label:'FXAA 抗锯齿',v:true},
+{k:'dof',g:'post',t:'b',label:'景深虚化',v:false},
+{k:'focus',g:'post',t:'r',label:'对焦距离',min:20,max:1200,st:5,v:260},
+{k:'dofAmt',g:'post',t:'r',label:'虚化强度',min:0,max:2,st:.05,v:.8},
+{k:'fov',g:'cam',t:'r',label:'视场角',min:35,max:110,st:1,v:62},
+{k:'autoRot',g:'cam',t:'r',label:'自动环绕',min:0,max:1,st:.01,v:.12},
+{k:'camH',g:'cam',t:'r',label:'相机高度',min:8,max:600,st:2,v:95},
+{k:'renderScale',g:'cam',t:'s',label:'渲染倍率',opts:['50%','66%','80%','100%','125%'],v:3},
+{k:'reset',g:'cam',t:'btn2',label:'复位相机'},
+];
+const S={}; DEFS.forEach(d=>S[d.k]=d.v); S.seed=(Math.random()*1e9)|0;
+const SCALES=[.5,.66,.8,1,1.25], SHADOWS=[1024,2048,4096];
+
+/* ================= 2. 数学库 ================= */
+const M4={
+ ident(){return new Float32Array([1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1])},
+ persp(f,as,n,fr){const t=1/Math.tan(f/2),nf=1/(n-fr),o=new Float32Array(16);o[0]=t/as;o[5]=t;o[10]=(fr+n)*nf;o[11]=-1;o[14]=2*fr*n*nf;return o},
+ lookAt(e,c,u){let zx=e[0]-c[0],zy=e[1]-c[1],zz=e[2]-c[2];let l=Math.hypot(zx,zy,zz)||1;zx/=l;zy/=l;zz/=l;
+  let xx=u[1]*zz-u[2]*zy,xy=u[2]*zx-u[0]*zz,xz=u[0]*zy-u[1]*zx;l=Math.hypot(xx,xy,xz)||1;xx/=l;xy/=l;xz/=l;
+  const yx=zy*xz-zz*xy,yy=zz*xx-zx*xz,yz=zx*xy-zy*xx;
+  return new Float32Array([xx,yx,zx,0,xy,yy,zy,0,xz,yz,zz,0,-(xx*e[0]+xy*e[1]+xz*e[2]),-(yx*e[0]+yy*e[1]+yz*e[2]),-(zx*e[0]+zy*e[1]+zz*e[2]),1])},
+ mul(a,b){const o=new Float32Array(16);for(let c=0;c<4;c++)for(let r=0;r<4;r++){let s=0;for(let i=0;i<4;i++)s+=a[i*4+r]*b[c*4+i];o[c*4+r]=s}return o},
+ ortho(l,r,b,t,n,f){const o=new Float32Array(16);o[0]=2/(r-l);o[5]=2/(t-b);o[10]=-2/(f-n);o[12]=-(r+l)/(r-l);o[13]=-(t+b)/(t-b);o[14]=-(f+n)/(f-n);o[15]=1;return o}
+};
+function basis(dir){let up=Math.abs(dir[1])>.94?[1,0,0]:[0,1,0];
+ let rx=up[1]*dir[2]-up[2]*dir[1],ry=up[2]*dir[0]-up[0]*dir[2],rz=up[0]*dir[1]-up[1]*dir[0];
+ const l=Math.hypot(rx,ry,rz)||1;rx/=l;ry/=l;rz/=l;
+ const ux=dir[1]*rz-dir[2]*ry,uy=dir[2]*rx-dir[0]*rz,uz=dir[0]*ry-dir[1]*rx;return[rx,ry,rz,ux,uy,uz]}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+
+/* ================= 3. GLSL 共享片段 ================= */
+const GLSL_COMMON=`
+float hash12(vec2 p){vec3 p3=fract(vec3(p.xyx)*.1031);p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}
+float hash13(vec3 p){p=fract(p*.1031);p+=dot(p,p.zyx+31.32);return fract((p.x+p.y)*p.z);}
+float vnoise(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
+ float a=hash12(i),b=hash12(i+vec2(1,0)),c=hash12(i+vec2(0,1)),d=hash12(i+vec2(1,1));
+ return mix(mix(a,b,f.x),mix(c,d,f.x),f.y);}
+float fbm(vec2 p){float v=0.,a=.5;for(int i=0;i<5;i++){v+=a*vnoise(p);p=p*2.03+vec2(17.3,9.1);a*=.5;}return v;}
+float fbm3(vec2 p){float v=0.,a=.5;for(int i=0;i<3;i++){v+=a*vnoise(p);p=p*2.03+vec2(17.3,9.1);a*=.5;}return v;}
+vec3 acesTonemap(vec3 x){return clamp(x*(2.51*x+.03)/(x*(2.43*x+.59)+.14),0.,1.);}
+vec3 reinhardTM(vec3 x){return x/(1.+x);}
+vec3 uncharted2TM(vec3 x){float A=.15,B=.5,C=.1,D=.2,E=.02,F=.3;
+ return ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F;}
+`;
+const GLSL_ATMO=`
+vec3 sunDirG; float turbG; float sunIntG;
+const float R_E=6371000.,ATMO_H=80000.;
+float rayleighDen(float h){return exp(-h/7994.);}
+float mieDen(float h){return exp(-h/1200.);}
+vec3 atmoSky(vec3 ro,vec3 rd){
+ vec3 bR=vec3(5.8e-6,13.5e-6,33.1e-6)*turbG;
+ vec3 bM=vec3(21e-6)*turbG;
+ float mu=dot(rd,sunDirG);
+ float phR=3./(16.*3.14159265)*(1.+mu*mu);
+ float g=.76,g2=g*g;
+ float phM=1./(4.*3.14159265)*(1.-g2)/pow(1.+g2-2.*g*mu,1.5);
+ float sr=sqrt(max(R_E*R_E+ro.y*(2.*R_E+ro.y),0.));
+ float tA=-ro.y-sr,tB=-ro.y+sr;
+ float t0=max(tA,0.),t1=max(tB,0.);
+ if(t1<=0.)return vec3(0.);
+ t1=min(t1,ATMO_H);
+ float N=10.;vec3 sumR=vec3(0.),sumM=vec3(0.);
+ for(float i=0.;i<10.;i++){
+  float t=t0+(i+.5)*(t1-t0)/N;
+  vec3 p=ro+rd*t;float h=max(p.y,0.);
+  float dR=rayleighDen(h)*((t1-t0)/N);
+  float dM=mieDen(h)*((t1-t0)/N);
+  vec3 sp=p+sunDirG*6000.;
+  float sh=max(length(sp)-R_E,0.);
+  float odR=rayleighDen(sh)*6000.,odM=mieDen(sh)*6000.;
+  vec3 att=exp(-(bR*(dR+odR)+bM*1.1*(dM+odM)));
+  sumR+=dR*att;sumM+=dM*att;
+ }
+ return (bR*phR*sumR+bM*phM*sumM)*sunIntG*20.;
+}
+vec3 skyBase(vec3 rd,vec3 sunD,vec3 moonD){
+ vec3 col=atmoSky(vec3(0.,max(uCamPos.y,4.),0.),rd);
+ float sd=max(dot(rd,sunD),0.);
+ col+=uSunCol*(pow(sd,1500.)*30.+pow(sd,6.)*.18)*uSunVis;
+ float night=1.-smoothstep(-.06,.25,sunD.y);
+ if(night>.001){
+  vec2 sp=rd.xz/(abs(rd.y)+.35);
+  float st=hash12(floor(sp*300.));
+  float star=step(.9974,st)*(.4+.6*sin(uTime*3.+st*600.));
+  col+=vec3(.8,.9,1.)*star*night*uStars*smoothstep(.02,.2,rd.y);
+  float md=dot(rd,moonD);
+  float mr=.052*uMoonSize;
+  if(md>1.-mr*3.){
+   float disc=smoothstep(1.-mr,1.-mr*.6,md);
+   float cres=clamp((md-(1.-mr))/(mr*1.6),0.,1.);cres=cres*cres;
+   float crat=hash12(floor(rd.xy*400.+rd.z*173.));
+   col+=vec3(.92,.95,1.05)*disc*cres*(.7+.3*crat)*night;
+  }
+ }
+ return col;
+}
+`;
+const GLSL_FOG=`
+vec3 applyFog(vec3 col,float dist,float hgt,vec3 fogCol){
+ float f=1.-exp(-dist*dist*uFogK);
+ float hf=exp(-max(hgt,0.)*uFogHInv)*1.6;
+ float amt=clamp(f*(.3+hf),0.,.97);
+ return mix(col,fogCol,amt);
+}
+`;
+const GLSL_SHADOW=`
+uniform sampler2D uShadowMap;
+uniform mat4 uShadowPl;
+uniform float uShadowSoft,uShadowTexel,uShadowBias;
+float getShadow(vec3 wp,vec3 n){
+ vec4 sp=uShadowPl*vec4(wp,1.);
+ vec3 P=sp.xyz/sp.w;
+ P=P*.5+.5;
+ if(P.x<.004||P.x>.996||P.y<.004||P.y>.996||P.z>.999)return 1.;
+ float bias=max(uShadowBias*.0025*(1.-dot(n,uSunDir)),.0004);
+ float d=P.z-bias;
+ vec2 uv=P.xy;
+ float s=0.;
+ for(int x=-1;x<=1;x++)for(int y=-1;y<=1;y++)
+  s+=step(d,texture(uShadowMap,uv+vec2(x,y)*uShadowTexel*max(uShadowSoft,.4)).r);
+ return s/9.;
+}
+`;
+const GLSL_LIGHT=`
+uniform vec3 uAmbCol,uBounceCol;
+uniform float uWet;
+vec3 shade(vec3 alb,vec3 n,vec3 V,vec3 wp,vec3 emis,float spec,float rough){
+ float ndl=max(dot(n,uSunDir),0.);
+ float sh=getShadow(wp,n);
+ vec3 H=normalize(uSunDir+V);
+ float sp=pow(max(dot(n,H),0.),mix(8.,220.,1.-rough))*spec*(ndl*sh);
+ vec3 col=alb*(uAmbCol*max(n.y,0.)+uBounceCol*max(-n.y,0.)*.6+uSunCol*ndl*sh)+uSunCol*sp;
+ if(uWet>.01){
+  vec3 R=reflect(-V,n);R.y=abs(R.y)+.05;
+  vec3 refl=skyBase(normalize(R),uSunDir,uMoonDir);
+  float fres=pow(1.-max(dot(n,V),0.),4.);
+  col+=refl*fres*uWet*.85+alb*uSunCol*sh*fres*uWet*.4;
+ }
+ return col+emis;
+}
+`;
+
+/* ================= 4. 各 Pass 着色器 ================= */
+const VS_QUAD=`#version 300 es
+out vec2 vUv;
+void main(){vec2 p=vec2(float((gl_VertexID<<1)&2),float(gl_VertexID&2));vUv=p;gl_Position=vec4(p*2.-1.,0.,1.);}`;
+
+const FS_SKY=`#version 300 es
+precision highp float;
+in vec2 vUv;out vec4 outColor;
+uniform mat4 uInvVP;uniform vec3 uCamPos,uSunDir,uMoonDir,uSunCol;
+uniform float uTime,uCamFar,uCloudCover,uCloudScale,uCloudSpeed,uCloudH,uStars,uMoonSize,uSunVis,uTurb,uSunInt,uFogK,uFogHInv;
+${GLSL_COMMON}${GLSL_ATMO}
+void main(){
+ vec4 wp4=uInvVP*vec4(vUv*2.-1.,1.,1.);
+ vec3 rd=normalize(wp4.xyz/wp4.w-uCamPos);
+ vec3 col=skyBase(rd,uSunDir,uMoonDir);
+ if(rd.y>.015){
+  vec2 cp=rd.xz/(rd.y+.06)*uCloudH*.00035*uCloudScale+vec2(uTime*uCloudSpeed*.012,uTime*uCloudSpeed*.007);
+  float cov=smoothstep(1.-uCloudCover-.05,1.-uCloudCover+.25,fbm(cp));
+  if(cov>.001){
+   float dens=fbm(cp*2.7+3.7)*.5+.5;
+   vec3 cbase=mix(vec3(.16,.18,.24),vec3(1.02,.99,.95),dens);
+   vec3 clit=uSunCol*(.25+.75*max(uSunDir.y,0.))*uSunVis+vec3(.10,.12,.18);
+   float glow=pow(max(dot(rd,uSunDir),0.),10.);
+   col=mix(col,cbase*clit*(1.+glow*1.5),cov*.92);
+  }
+ }
+ float hz=exp(-max(rd.y,0.)*5.);
+ col=mix(col,uSunCol*.55*max(uSunDir.y,0.)+vec3(.05,.06,.09),hz*.35);
+ outColor=vec4(col,1.);
+}`;
+
+const VS_BUILD=`#version 300 es
+layout(location=0) in vec3 aPos;layout(location=1) in vec3 aNorm;
+layout(location=2) in vec4 iA;layout(location=3) in vec4 iB;layout(location=4) in vec4 iC;layout(location=5) in vec4 iD;
+uniform mat4 uProj,uView;
+out vec3 vLocal,vWorld,vNormal,vCol;out vec4 vFace,vData;
+void main(){
+ vec3 size=iB.xyz;float rot=iB.w;
+ float cr=cos(rot),sr=sin(rot);
+ vec3 p=aPos*size;
+ vec3 rp=vec3(cr*p.x+sr*p.z,p.y,-sr*p.x+cr*p.z);
+ vec3 rn=vec3(cr*aNorm.x+sr*aNorm.z,aNorm.y,-sr*aNorm.x+cr*aNorm.z);
+ vLocal=aPos+.5;vNormal=rn;vData=iC;vCol=iD.xyz;
+ float faceId=aNorm.x>0.?0.:(aNorm.x<0.?1.:(aNorm.z>0.?2.:(aNorm.z<0.?3.:(aNorm.y>0.?4.:5.))));
+ vFace=vec4(faceId,iB.y,size.x,size.z);
+ vec3 wp=rp+iA.xyz;vWorld=wp;
+ gl_Position=uProj*uView*vec4(wp,1.);
+}`;
+
+const FS_BUILD=`#version 300 es
+precision highp float;
+in vec3 vLocal,vWorld,vNormal,vCol;in vec4 vFace,vData;out vec4 outColor;
+uniform mat4 uInvVP;uniform vec3 uCamPos,uSunDir,uMoonDir,uSunCol;
+uniform float uTime,uCamFar,uWinGlow,uLitProb,uWarmth,uNeonInt,uNeonDens,uRoofDet,uAntenna,uWinDens,uGlass,uSunVis,uStars,uMoonSize,uFogK,uFogHInv;
+${GLSL_COMMON}${GLSL_ATMO}${GLSL_SHADOW}${GLSL_LIGHT}${GLSL_FOG}
+void main(){
+ vec3 n=normalize(vNormal);vec3 V=normalize(uCamPos-vWorld);
+ float seed=vData.w,style=vData.x,podH=vData.y*3.,glassK=vData.z;
+ float faceId=vFace.x;vec2 sizeXZ=vFace.zw;
+ vec3 alb=vCol;float emis=0.;vec3 emisCol=vec3(0.);float rough=mix(.75,.12,glassK);float spec=mix(.25,1.,glassK);
+ float storyH=mix(3.4,4.4,hash12(vec2(seed*7.1,3.3)));
+ if(faceId<3.5){
+  float wU=(faceId<1.5)?vLocal.z:vLocal.x;
+  float wW=(faceId<1.5)?sizeXZ.y:sizeXZ.x;
+  float h=vLocal.y*vFace.y;
+  float ground=1.-step(max(podH,3.2),h);
+  float cols=max(2.,floor(wW*uWinDens/mix(2.6,3.4,hash12(vec2(seed,5.)))));
+  float rows=max(2.,floor((h-max(podH,2.6))/storyH));
+  vec2 gu=vec2(wU*cols,(h-max(podH,0.))/storyH);
+  vec2 cid=floor(gu);vec2 f=fract(gu);
+  float id=hash12(cid+vec2(seed*13.7,faceId*7.1));
+  float wIns=mix(.6,.78,hash12(vec2(seed,9.2)));
+  vec2 win=step(vec2((1.-wIns)*.5),f)*step(f,vec2(1.-(1.-wIns)*.5));
+  float winMask=win.x*win.y;
+  float sill=step(.10,f.y)*step(f.y,.94);winMask*=sill;
+  float spandrel=1.-winMask;
+  vec3 facade=alb;
+  float matV=hash12(vec2(seed,11.));
+  if(matV<.3)facade*=.85+.3*step(.5,fract(vLocal.y*8.+seed*3.));
+  if(matV>.7)facade*=.9+.2*vnoise(vec2(wU*wW*3.,h*1.5)+seed*40.);
+  float pv=.82+.36*hash12(cid+vec2(seed*3.1,faceId));
+  vec3 col=mix(facade,facade*.35,winMask*pv);
+  float skyRefl=mix(.25,.8,glassK);
+  vec3 R=reflect(-V,n);R.y=abs(R.y)+.03;
+  vec3 refl=skyBase(normalize(R),uSunDir,uMoonDir)*skyRefl;
+  col+=refl*mix(.12,.75,winMask)*mix(.4,1.,glassK);
+  float nightK=1.-smoothstep(-.05,.22,uSunDir.y);
+  float lit=step(1.-uLitProb,hash12(cid+vec2(seed*17.3,faceId*3.7)));
+  float onOff=step(.5,fract(hash12(cid+vec2(seed,29.))+floor(uTime*.004)*.618));
+  float flick=1.-.06*step(.93,hash12(cid+vec2(seed,31.)))*(.5+.5*sin(uTime*17.+id*80.));
+  float warm=mix(.35,1.,uWarmth);
+  vec3 wcol=mix(vec3(1.,.62,.32)*warm,vec3(.62,.8,1.)*(1.35-warm),step(.72,hash12(cid+vec2(seed*5.1,1.7))));
+  float e=winMask*lit*onOff*flick*nightK*uWinGlow;
+  col=mix(col,wcol*(.25+.75*pv),clamp(e*.35,0.,1.));
+  emisCol+=wcol*e*2.2;
+  if(ground>.5){
+   float shop=step(.12,wU)*step(wU,.88)*step(.15,h)*step(h,max(podH,2.6)*.85);
+   vec3 scol=mix(vec3(.05,.06,.07),wcol*.5,hash12(vec2(floor(wU*3.),seed)));
+   col=mix(col,scol,shop*.8);
+   emisCol+=scol*shop*nightK*uWinGlow*.5;
+   if(hash12(vec2(seed,41.))<uNeonDens*.8){
+    float band=step(.62,h/max(podH,3.))*step(h/max(podH,3.),.78);
+    vec3 ncol=.5+.5*cos(6.2831*(hash12(vec2(seed,43.))+vec3(0.,.33,.67)));
+    float pulse=.75+.25*sin(uTime*(1.5+hash12(vec2(seed,45.))*3.)+seed*90.);
+    float nm=band*step(.06,wU)*step(wU,.94);
+    col=mix(col,ncol*.2,nm);
+    emisCol+=ncol*nm*nightK*uNeonInt*2.6*pulse;
+   }
+  }
+  float edge=min(min(f.x,1.-f.x),min(f.y,1.-f.y));
+  col*=1.-.12*smoothstep(.12,0.,edge)*winMask;
+  alb=col;
+ }else if(faceId<4.5){
+  float h=vFace.y;
+  vec2 ruv=vLocal.xz*sizeXZ;
+  float g=fbm3(ruv*.7+seed*10.);
+  vec3 col=alb*(.55+.3*g);
+  float mx=.55/max(sizeXZ.x,1.),mz=.55/max(sizeXZ.y,1.);
+  float inside=step(mx,vLocal.x)*step(vLocal.x,1.-mx)*step(mz,vLocal.z)*step(vLocal.z,1.-mz);
+  col=mix(col,alb*.42,(1.-inside)*uRoofDet);
+  if(uRoofDet>.05&&hash12(vec2(seed,51.))<uRoofDet*.8){
+   vec2 tc=vec2(.32+.2*hash12(vec2(seed,53.)),.32+.2*hash12(vec2(seed,57.)));
+   float tank=(1.-smoothstep(.055,.075,length(vLocal.xz-tc)))*step(.5,uRoofDet);
+   col=mix(col,vec3(.35,.33,.3)*(.7+.3*g),tank);
+  }
+  if(uAntenna>.05&&h>55.&&hash12(vec2(seed,61.))<uAntenna){
+   float am=1.-smoothstep(.006,.014,length(vLocal.xz-vec2(.5)));
+   col=mix(col,vec3(.25),am);
+   float nightK=1.-smoothstep(-.05,.22,uSunDir.y);
+   float blink=step(.82,fract(uTime*1.2+seed*10.));
+   emisCol+=vec3(1.,.08,.05)*am*nightK*blink*3.;
+  }
+  alb=col;
+ }else{
+  alb=alb*.5;
+ }
+ vec3 col=shade(alb,n,V,vWorld,emisCol,spec,rough);
+ float dist=length(uCamPos-vWorld);
+ vec3 fogCol=skyBase(normalize(vec3(vWorld.x-uCamPos.x,0.,vWorld.z-uCamPos.z)+vec3(0.,.06,0.)),uSunDir,uMoonDir);
+ col=applyFog(col,dist,vWorld.y-uCamPos.y,fogCol);
+ outColor=vec4(col,1.);
+}`;
+
+const VS_GROUND=`#version 300 es
+layout(location=0) in vec2 aPos;
+uniform mat4 uProj,uView,uInvVP;uniform vec3 uCamPos;uniform float uCamFar;
+out vec3 vWorld;out vec2 vUv;
+void main(){
+ vec4 wp4=uInvVP*vec4(aPos,0.99999,1.);
+ vec3 wp=wp4.xyz/wp4.w;
+ vec3 dir=wp-uCamPos;
+ float t=uCamFar*.96/max(-dir.y,.0001);
+ wp=uCamPos+dir*max(t,0.);
+ vWorld=wp;vUv=aPos;gl_Position=vec4(aPos,0.99999,1.);
+}`;
+
+const FS_GROUND=`#version 300 es
+precision highp float;
+in vec3 vWorld;in vec2 vUv;out vec4 outColor;
+uniform mat4 uInvVP;uniform vec3 uCamPos,uSunDir,uMoonDir,uSunCol;
+uniform float uTime,uCamFar,uBlock,uRoad,uFogK,uFogHInv,uStreetInt,uWarmth,uSunVis,uStars,uMoonSize;
+${GLSL_COMMON}${GLSL_ATMO}${GLSL_SHADOW}${GLSL_LIGHT}${GLSL_FOG}
+void main(){
+ vec4 wp4=uInvVP*vec4(vUv,0.99999,1.);
+ vec3 gdir=wp4.xyz/wp4.w-uCamPos;
+ if(gdir.y>-.0005)discard;
+ vec3 n=vec3(0.,1.,0.);vec3 V=normalize(uCamPos-vWorld);
+ float cell=uBlock+uRoad;
+ vec2 g=vWorld.xz/cell;
+ vec2 f=fract(g)-.5;
+ vec2 rw=vec2(uRoad*.5)/cell;
+ vec2 a=abs(f);
+ float roadM=1.-step(rw.x,a.x)*step(rw.y,a.y);
+ float inter=step(a.x,rw.x)*step(a.y,rw.y);
+ float laneX=1.-smoothstep(.012,.03,abs(f.y));
+ float laneZ=1.-smoothstep(.012,.03,abs(f.x));
+ float dashX=step(fract(vWorld.x*.35),.55);
+ float dashZ=step(fract(vWorld.z*.35),.55);
+ float lane=(laneX*step(rw.y,a.y)*dashX)+(laneZ*step(rw.x,a.x)*dashZ);
+ lane*=1.-inter;
+ float cw1=step(.62,fract(vWorld.x*.5))*step(rw.x+.012,a.x)*step(a.x,rw.x+.09)*step(a.y,rw.y*.85);
+ float cw2=step(.62,fract(vWorld.z*.5))*step(rw.y+.012,a.y)*step(a.y,rw.y+.09)*step(a.x,rw.x*.85);
+ float cross=max(cw1,cw2);
+ float n1=vnoise(vWorld.xz*.8),n2=vnoise(vWorld.xz*3.1);
+ vec3 asphalt=vec3(.05,.052,.058)*(.75+.5*n1);
+ vec3 sidewalk=vec3(.13,.128,.12)*(.8+.4*n2);
+ vec3 col=mix(sidewalk,asphalt,roadM);
+ col=mix(col,vec3(.55,.52,.42),clamp(cross*.75,0.,1.));
+ col=mix(col,vec3(.6,.55,.35),clamp(lane*.6,0.,1.));
+ float curb=step(max(a.x-rw.x,a.y-rw.y),.012)*(1.-inter);
+ col*=1.+curb*.25;
+ float cellId=hash12(floor(g));
+ col*=.9+.2*cellId;
+ float lampX=step(fract(vWorld.x/cell+.5),.045)*step(rw.x+.004,a.x)*step(a.x,rw.x+.05)*step(a.y,rw.y);
+ float lampZ=step(fract(vWorld.z/cell+.5),.045)*step(rw.y+.004,a.y)*step(a.y,rw.y+.05)*step(a.x,rw.x);
+ float lamp=max(lampX,lampZ);
+ float nightK=1.-smoothstep(-.05,.22,uSunDir.y);
+ vec3 lampCol=mix(vec3(1.,.72,.4),vec3(1.,.88,.7),uWarmth);
+ col=mix(col,vec3(.16),lamp);
+ vec3 lightC=clamp(uSunCol*max(dot(n,uSunDir),0.)*getShadow(vWorld,n),0.,60.);
+ vec3 amb=uAmbCol;
+ vec3 res=col*(amb+lightC+uBounceCol*.3);
+ if(uWet>.01){
+  vec3 R=reflect(-V,n);R.y=abs(R.y)+.05;
+  vec3 refl=skyBase(normalize(R),uSunDir,uMoonDir);
+  float puddle=smoothstep(.55,.8,fbm(vWorld.xz*.13+7.))*uWet;
+  float fres=pow(1.-max(dot(n,V),0.),3.);
+  res+=refl*(fres*.5+puddle*.55)*uWet;
+  res+=lightC*col*puddle*.8;
+ }
+ res+=lampCol*lamp*nightK*uStreetInt*3.5;
+ float dist=length(uCamPos-vWorld);
+ vec3 fogCol=skyBase(normalize(vec3(vWorld.x-uCamPos.x,0.,vWorld.z-uCamPos.z)+vec3(0.,.06,0.)),uSunDir,uMoonDir);
+ res=applyFog(res,dist,0.,fogCol);
+ outColor=vec4(res,1.);
+}`;
+
+const VS_CAR=`#version 300 es
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec4 iPos;layout(location=2) in vec4 iPar;
+uniform mat4 uProj,uView;
+out vec3 vLocal,vWorld;out vec4 vPar;
+void main(){
+ float cr=cos(iPar.w),sr=sin(iPar.w);
+ vec3 p=vec3(cr*aPos.x+sr*aPos.z,aPos.y,-sr*aPos.x+cr*aPos.z);
+ vec3 wp=p*vec3(1.05,.9,2.3)+iPos.xyz;
+ vLocal=aPos+.5;vWorld=wp;vPar=iPar;
+ gl_Position=uProj*uView*vec4(wp,1.);
+}`;
+
+const FS_CAR=`#version 300 es
+precision highp float;
+in vec3 vLocal,vWorld;in vec4 vPar;out vec4 outColor;
+uniform mat4 uInvVP;uniform vec3 uCamPos,uSunDir,uMoonDir,uSunCol;
+uniform float uTime,uCamFar,uFogK,uFogHInv,uSunVis,uStars,uMoonSize;
+${GLSL_COMMON}${GLSL_ATMO}${GLSL_SHADOW}${GLSL_LIGHT}${GLSL_FOG}
+void main(){
+ vec3 n=normalize(vLocal-.5);
+ if(abs(n.y)>.7)n=vec3(0.,sign(n.y),0.);else{n.y=0.;n=normalize(n);}
+ vec3 V=normalize(uCamPos-vWorld);
+ float nightK=1.-smoothstep(-.05,.22,uSunDir.y);
+ vec3 body=vPar.xyz;
+ float cabin=step(.62,vLocal.y)*step(vLocal.x,.15)+step(vLocal.x,.85)*step(.62,vLocal.y);
+ float glass=step(.2,vLocal.x)*step(vLocal.x,.8)*step(.6,vLocal.y);
+ body=mix(body,vec3(.03,.04,.05),clamp(glass+cabin*.5,0.,1.));
+ vec3 emis=vec3(0.);
+ float front=step(.97,vLocal.z),rear=step(vLocal.z,.03);
+ float lightX=step(abs(vLocal.x-.5),.32);
+ emis+=vec3(1.,.95,.85)*front*lightX*(.35+2.2*nightK);
+ emis+=vec3(1.,.06,.03)*rear*lightX*(.5+2.5*nightK);
+ vec3 col=shade(body,n,V,vWorld,emis,.9,.25);
+ float dist=length(uCamPos-vWorld);
+ vec3 fogCol=skyBase(normalize(vec3(vWorld.x-uCamPos.x,0.,vWorld.z-uCamPos.z)+vec3(0.,.06,0.)),uSunDir,uMoonDir);
+ col=applyFog(col,dist,vWorld.y-uCamPos.y,fogCol);
+ outColor=vec4(col,1.);
+}`;
+
+const VS_RAIN=`#version 300 es
+layout(location=0) in vec2 aCorner;
+layout(location=1) in vec4 iPos;
+uniform mat4 uProj,uView;uniform vec3 uCamRight,uCamUp;uniform float uRainInt;
+out float vA;out vec2 vUv;
+void main(){
+ float len=mix(.7,1.6,iPos.w);
+ vec3 wp=iPos.xyz+uCamRight*aCorner.x*.05+uCamUp*aCorner.y*len;
+ vUv=aCorner;vA=.5;
+ gl_Position=uProj*uView*vec4(wp,1.);
+}`;
+
+const FS_RAIN=`#version 300 es
+precision highp float;
+in float vA;in vec2 vUv;out vec4 outColor;
+uniform vec3 uSunCol;uniform float uRainInt;
+void main(){
+ float a=smoothstep(1.,0.,abs(vUv.x))*smoothstep(1.,.2,abs(vUv.y));
+ outColor=vec4((vec3(.5,.55,.65)+uSunCol*.25)*a*uRainInt*.5,a*uRainInt*.4);
+}`;
+
+const VS_SNOW=`#version 300 es
+layout(location=0) in vec2 aCorner;
+layout(location=1) in vec4 iPos;
+uniform mat4 uProj,uView;uniform vec3 uCamRight,uCamUp;uniform float uSnowInt,uTime;
+out vec2 vUv;
+void main(){
+ vec3 wp=iPos.xyz+(uCamRight+uCamUp)*aCorner.x*.06*iPos.w;
+ vUv=aCorner;
+ gl_Position=uProj*uView*vec4(wp,1.);
+}`;
+
+const FS_SNOW=`#version 300 es
+precision highp float;
+in vec2 vUv;out vec4 outColor;
+uniform float uSnowInt;
+void main(){
+ float a=smoothstep(1.,.2,length(vUv));
+ outColor=vec4(vec3(.9,.93,1.)*a*uSnowInt*.8,a*uSnowInt*.7);
+}`;
+
+const VS_LAMP=`#version 300 es
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec4 iPos;
+uniform mat4 uProj,uView;
+out vec3 vWorld;
+void main(){
+ vec3 wp=aPos*vec3(.12,.12,.12)+iPos.xyz;
+ vWorld=wp;
+ gl_Position=uProj*uView*vec4(wp,1.);
+}`;
+
+const FS_LAMP=`#version 300 es
+precision highp float;
+in vec3 vWorld;out vec4 outColor;
+uniform vec3 uSunDir,uCamPos;uniform float uStreetInt,uWarmth;
+void main(){
+ float nightK=1.-smoothstep(-.05,.22,uSunDir.y);
+ vec3 lampCol=mix(vec3(1.,.72,.4),vec3(1.,.88,.7),uWarmth);
+ outColor=vec4(lampCol*(.2+nightK*uStreetInt*4.),1.);
+}`;
+
+const VS_SHADOW=`#version 300 es
+layout(location=0) in vec3 aPos;
+layout(location=2) in vec4 iA;layout(location=3) in vec4 iB;
+uniform mat4 uProj,uView;
+void main(){
+ vec3 p=aPos*iB.xyz;
+ float cr=cos(iB.w),sr=sin(iB.w);
+ vec3 rp=vec3(cr*p.x+sr*p.z,p.y,-sr*p.x+cr*p.z);
+ gl_Position=uProj*uView*vec4(rp+iA.xyz,1.);
+}`;
+
+const FS_SHADOW=`#version 300 es
+precision highp float;
+void main(){}`;
+
+const FS_BRIGHT=`#version 300 es
+precision highp float;
+in vec2 vUv;out vec4 outColor;
+uniform sampler2D uTex;uniform float uThr;
+void main(){
+ vec3 c=texture(uTex,vUv).rgb;
+ float l=dot(c,vec3(.2126,.7152,.0722));
+ outColor=vec4(c*smoothstep(uThr,uThr+1.2,l),1.);
+}`;
+
+const FS_BLUR=`#version 300 es
+precision highp float;
+in vec2 vUv;out vec4 outColor;
+uniform sampler2D uTex;uniform vec2 uDir;
+void main(){
+ vec3 c=texture(uTex,vUv).rgb*.227027;
+ vec2 o1=uDir*1.3846,o2=uDir*3.2308;
+ c+=(texture(uTex,vUv+o1).rgb+texture(uTex,vUv-o1).rgb)*.3162162;
+ c+=(texture(uTex,vUv+o2).rgb+texture(uTex,vUv-o2).rgb)*.0702703;
+ outColor=vec4(c,1.);
+}`;
+
+const FS_POST=`#version 300 es
+precision highp float;
+in vec2 vUv;out vec4 outColor;
+${GLSL_COMMON}
+uniform sampler2D uScene,uBloomT,uDepthT;
+uniform float uExposure,uTonemap,uSat,uContrast,uTint,uBloomInt,uVig,uGrain,uChroma,uTime,uDofOn,uFocus,uDofAmt,uCamNear,uCamFar,uFxaaOn;
+uniform vec2 uTexel;
+float linDepth(float d){return uCamNear*uCamFar/(uCamFar-d*(uCamFar-uCamNear));}
+vec3 grade(vec3 c){
+ c*=uExposure;
+ if(uTonemap<.5)c=acesTonemap(c);
+ else if(uTonemap<1.5)c=reinhardTM(c);
+ else if(uTonemap<2.5)c=clamp(uncharted2TM(c)*6.25,0.,1.);
+ else c=clamp(c,0.,1.);
+ c=pow(c,vec3(1./2.2));
+ float l=dot(c,vec3(.299,.587,.114));
+ c=mix(vec3(l),c,uSat);
+ c=(c-.5)*uContrast+.5;
+ c*=vec3(1.+uTint*.12,1.,1.-uTint*.12);
+ return clamp(c,0.,1.);
+}
+void main(){
+ vec2 uv=vUv;
+ vec2 d=uv-.5;
+ float ca=uChroma*dot(d,d)*.06;
+ vec3 col;
+ col.r=texture(uScene,uv+d*ca).r;
+ col.g=texture(uScene,uv).g;
+ col.b=texture(uScene,uv-d*ca).b;
+ if(uDofOn>.5){
+  float depth=linDepth(texture(uDepthT,uv).r);
+  float coc=clamp(abs(depth-uFocus)*.02*uDofAmt,0.,1.)*6.;
+  vec3 acc=col;float tw=1.;
+  for(int i=0;i<12;i++){
+   float an=float(i)*2.39996;
+   vec2 off=vec2(cos(an),sin(an))*coc*uTexel;
+   acc+=texture(uScene,uv+off).rgb;tw+=1.;
+  }
+  col=acc/tw;
+ }
+ col+=texture(uBloomT,uv).rgb*uBloomInt;
+ col=grade(col);
+ float vig=1.-uVig*smoothstep(.45,1.4,length(d)*1.9);
+ col*=vig;
+ col+=(hash12(uv*vec2(1920.,1080.)+fract(uTime)*7.1)-.5)*uGrain*.09;
+ if(uFxaaOn>.5){
+  vec3 rgbN=texture(uScene,uv+vec2(0.,-uTexel.y)).rgb;
+  vec3 rgbS=texture(uScene,uv+vec2(0.,uTexel.y)).rgb;
+  vec3 rgbW=texture(uScene,uv+vec2(-uTexel.x,0.)).rgb;
+  vec3 rgbE=texture(uScene,uv+vec2(uTexel.x,0.)).rgb;
+  vec3 luma=vec3(.299,.587,.114);
+  float lC=dot(col,luma),lN=dot(grade(rgbN),luma),lS=dot(grade(rgbS),luma),lW=dot(grade(rgbW),luma),lE=dot(grade(rgbE),luma);
+  float lMin=min(lC,min(min(lN,lS),min(lW,lE)));
+  float lMax=max(lC,max(max(lN,lS),max(lW,lE)));
+  float range=lMax-lMin;
+  if(range>max(.04,lMax*.12)){
+   float dirX=-((lN+lS)-(lW+lE));
+   float dirY=((lN-lS)+(lW-lE));
+   vec2 dir=normalize(vec2(dirX,dirY));
+   float sharp=.35;
+   vec3 r1=.5*(grade(texture(uScene,uv+dir*uTexel*-.5).rgb)+grade(texture(uScene,uv+dir*uTexel*.5).rgb));
+   vec3 r2=r1*.5+.25*(grade(texture(uScene,uv+dir*uTexel*-1.5).rgb)+grade(texture(uScene,uv+dir*uTexel*1.5).rgb));
+   float l2=dot(r2,luma);
+   col=(l2<lMin||l2>lMax)?r1:r2;
+  }
+ }
+ outColor=vec4(col,1.);
+}`;
+
+/* ================= 5. GL 初始化与工具 ================= */
+const canvas=document.getElementById('view');
+const gl=canvas.getContext('webgl2',{antialias:false,depth:false,powerPreference:'high-performance'});
+const errEl=document.getElementById('err');
+if(!gl){errEl.style.display='grid';errEl.textContent='您的浏览器不支持 WebGL2，无法运行本渲染器。请使用最新版 Chrome / Edge / Firefox。';throw new Error('WebGL2 unavailable');}
+const hasF16=!!gl.getExtension('EXT_color_buffer_float');
+
+function compile(type,src){const s=gl.createShader(type);gl.shaderSource(s,src);gl.compileShader(s);
+ if(!gl.getShaderParameter(s,gl.COMPILE_STATUS)){const log=gl.getShaderInfoLog(s);console.error(src);throw new Error('着色器编译失败: '+log);}return s;}
+function program(vs,fs){const p=gl.createProgram();
+ gl.attachShader(p,compile(gl.VERTEX_SHADER,vs));gl.attachShader(p,compile(gl.FRAGMENT_SHADER,fs));
+ gl.linkProgram(p);
+ if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw new Error('着色器链接失败: '+gl.getProgramInfoLog(p));
+ p._u={};return p;}
+function U(p,n){if(!(n in p._u))p._u[n]=gl.getUniformLocation(p,n);return p._u[n];}
+function su(p,n,v){const l=U(p,n);if(!l)return;
+ if(typeof v==='number')gl.uniform1f(l,v);
+ else if(v.length===2)gl.uniform2f(l,v[0],v[1]);
+ else if(v.length===3)gl.uniform3f(l,v[0],v[1],v[2]);
+ else if(v.length===16)gl.uniformMatrix4fv(l,false,v);}
+function sui(p,n,v){const l=U(p,n);if(l)gl.uniform1i(l,v);}
+
+function allocFBO(f,w,h,depth){
+ if(f.tex)gl.deleteTexture(f.tex);if(f.dt)gl.deleteTexture(f.dt);if(f.fb)gl.deleteFramebuffer(f.fb);
+ f.w=w;f.h=h;
+ f.tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,f.tex);
+ if(hasF16)gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA16F,w,h,0,gl.RGBA,gl.HALF_FLOAT,null);
+ else gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA8,w,h,0,gl.RGBA,gl.UNSIGNED_BYTE,null);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+ f.fb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,f.fb);
+ gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,f.tex,0);
+ f.dt=null;
+ if(depth){f.dt=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,f.dt);
+  gl.texImage2D(gl.TEXTURE_2D,0,gl.DEPTH_COMPONENT24,w,h,0,gl.DEPTH_COMPONENT,gl.UNSIGNED_INT,null);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.TEXTURE_2D,f.dt,0);}
+ gl.bindFramebuffer(gl.FRAMEBUFFER,null);return f;}
+
+const shadowFBO={fb:null,tex:null,size:0};
+function allocShadow(res){
+ if(shadowFBO.fb){gl.deleteFramebuffer(shadowFBO.fb);gl.deleteTexture(shadowFBO.tex);}
+ shadowFBO.size=res;
+ shadowFBO.tex=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,shadowFBO.tex);
+ gl.texImage2D(gl.TEXTURE_2D,0,gl.DEPTH_COMPONENT24,res,res,0,gl.DEPTH_COMPONENT,gl.UNSIGNED_INT,null);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+ shadowFBO.fb=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,shadowFBO.fb);
+ gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.TEXTURE_2D,shadowFBO.tex,0);
+ gl.drawBuffers([gl.NONE]);gl.readBuffer(gl.NONE);
+ gl.bindFramebuffer(gl.FRAMEBUFFER,null);}
+
+function buf(data,usage){const b=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,b);gl.bufferData(gl.ARRAY_BUFFER,data,usage||gl.STATIC_DRAW);return b;}
+
+/* ---- 几何体 ---- */
+const CUBE=(()=>{const N=[[1,0,0],[-1,0,0],[0,0,1],[0,0,-1],[0,1,0],[0,-1,0]];const v=[];
+ for(const n of N){const up=Math.abs(n[1])>.9?[1,0,0]:[0,1,0];
+  const t=[up[1]*n[2]-up[2]*n[1],up[2]*n[0]-up[0]*n[2],up[0]*n[1]-up[1]*n[0]];
+  const b=[n[1]*t[2]-n[2]*t[1],n[2]*t[0]-n[0]*t[2],n[0]*t[1]-n[1]*t[0]];
+  const c=[n[0]*.5+.5,n[1]*.5+.5,n[2]*.5+.5];
+  for(const q of [[-1,-1],[1,-1],[1,1],[-1,-1],[1,1],[-1,1]])
+   v.push(c[0]+t[0]*q[0]*.5+b[0]*q[1]*.5,c[1]+t[1]*q[0]*.5+b[1]*q[1]*.5,c[2]+t[2]*q[0]*.5+b[2]*q[1]*.5,n[0],n[1],n[2]);}
+ return new Float32Array(v);})();
+const QUAD=new Float32Array([-1,-1,1,-1,1,1,-1,-1,1,1,-1,1]);
+const cubeBuf=buf(CUBE),quadBuf=buf(QUAD);
+
+let P={};
+try{
+ P={sky:program(VS_QUAD,FS_SKY),build:program(VS_BUILD,FS_BUILD),ground:program(VS_GROUND,FS_GROUND),
+    car:program(VS_CAR,FS_CAR),rain:program(VS_RAIN,FS_RAIN),snow:program(VS_SNOW,FS_SNOW),
+    lamp:program(VS_LAMP,FS_LAMP),shadow:program(VS_SHADOW,FS_SHADOW),
+    bright:program(VS_QUAD,FS_BRIGHT),blur:program(VS_QUAD,FS_BLUR),post:program(VS_QUAD,FS_POST)};
+}catch(e){errEl.style.display='grid';errEl.textContent='着色器初始化失败：'+e.message;throw e;}
+
+/* ---- VAO ---- */
+const MAXCARS=700,MAXP=4000;
+const groundVAO=gl.createVertexArray();
+gl.bindVertexArray(groundVAO);gl.bindBuffer(gl.ARRAY_BUFFER,quadBuf);
+gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+gl.bindVertexArray(null);
+function makeBuildingVAO(instBuf){const vao=gl.createVertexArray();gl.bindVertexArray(vao);
+ gl.bindBuffer(gl.ARRAY_BUFFER,cubeBuf);
+ gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);
+ gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,3,gl.FLOAT,false,24,12);
+ gl.bindBuffer(gl.ARRAY_BUFFER,instBuf);
+ for(let i=0;i<4;i++){gl.enableVertexAttribArray(2+i);gl.vertexAttribPointer(2+i,4,gl.FLOAT,false,64,i*16);gl.vertexAttribDivisor(2+i,1);}
+ gl.bindVertexArray(null);return vao;}
+function makeShadowVAO(instBuf){const vao=gl.createVertexArray();gl.bindVertexArray(vao);
+ gl.bindBuffer(gl.ARRAY_BUFFER,cubeBuf);
+ gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);
+ gl.bindBuffer(gl.ARRAY_BUFFER,instBuf);
+ gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,4,gl.FLOAT,false,64,0);gl.vertexAttribDivisor(2,1);
+ gl.enableVertexAttribArray(3);gl.vertexAttribPointer(3,4,gl.FLOAT,false,64,16);gl.vertexAttribDivisor(3,1);
+ gl.bindVertexArray(null);return vao;}
+function makeLampVAO(instBuf){const vao=gl.createVertexArray();gl.bindVertexArray(vao);
+ gl.bindBuffer(gl.ARRAY_BUFFER,cubeBuf);
+ gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);
+ gl.bindBuffer(gl.ARRAY_BUFFER,instBuf);
+ gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,4,gl.FLOAT,false,16,0);gl.vertexAttribDivisor(1,1);
+ gl.bindVertexArray(null);return vao;}
+const carBuf=buf(new Float32Array(MAXCARS*8),gl.DYNAMIC_DRAW);
+const carVAO=gl.createVertexArray();
+gl.bindVertexArray(carVAO);
+gl.bindBuffer(gl.ARRAY_BUFFER,cubeBuf);
+gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,3,gl.FLOAT,false,24,0);
+gl.bindBuffer(gl.ARRAY_BUFFER,carBuf);
+gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,4,gl.FLOAT,false,32,0);gl.vertexAttribDivisor(1,1);
+gl.enableVertexAttribArray(2);gl.vertexAttribPointer(2,4,gl.FLOAT,false,32,16);gl.vertexAttribDivisor(2,1);
+gl.bindVertexArray(null);
+const rainBuf=buf(new Float32Array(MAXP*4),gl.DYNAMIC_DRAW),snowBuf=buf(new Float32Array(MAXP*4),gl.DYNAMIC_DRAW);
+const rainVAO=gl.createVertexArray(),snowVAO=gl.createVertexArray();
+for(const [vao,b] of [[rainVAO,rainBuf],[snowVAO,snowBuf]]){
+ gl.bindVertexArray(vao);gl.bindBuffer(gl.ARRAY_BUFFER,quadBuf);
+ gl.enableVertexAttribArray(0);gl.vertexAttribPointer(0,2,gl.FLOAT,false,0,0);
+ gl.bindBuffer(gl.ARRAY_BUFFER,b);
+ gl.enableVertexAttribArray(1);gl.vertexAttribPointer(1,4,gl.FLOAT,false,16,0);gl.vertexAttribDivisor(1,1);
+ gl.bindVertexArray(null);}
+
+/* ================= 6. 城市分块生成 ================= */
+const CHUNK=320;
+const chunks=new Map();
+function hsl2rgb(h,s,l){const a=s*Math.min(l,1-l);const f=n=>{const k=(n+h*12)%12;return l-a*Math.max(-1,Math.min(k-3,Math.min(9-k,1)))};return[f(0),f(8),f(4)];}
+function buildChunk(cx,cz){
+ const cell=S.blockSize+S.roadWidth;
+ const x0=cx*CHUNK,z0=cz*CHUNK;
+ const full=[],lod=[],lamps=[];
+ const gx0=Math.floor(x0/cell)-1,gx1=Math.floor((x0+CHUNK)/cell)+1;
+ const gz0=Math.floor(z0/cell)-1,gz1=Math.floor((z0+CHUNK)/cell)+1;
+ for(let gx=gx0;gx<=gx1;gx++)for(let gz=gz0;gz<=gz1;gz++){
+  const bcx=gx*cell,bcz=gz*cell;
+  if(bcx<x0||bcx>=x0+CHUNK||bcz<z0||bcz>=z0+CHUNK)continue;
+  const cr=mulberry32(((S.seed*2654435761)^(gx*40503)^(gz*69493))>>>0);
+  const distC=Math.hypot(bcx,bcz);
+  const center=Math.exp(-distC/(2600*(.25+S.downtown)));
+  if(cr()>S.density)continue;
+  const bw=cell-S.roadWidth;
+  const maxH=(14+center*300*Math.pow(cr(),1.6))*(.5+S.heightVar*cr()*1.5)*S.heightScale;
+  const h=Math.max(8,maxH);
+  const rot=(cr()-.5)*S.rotJitter*.5;
+  const pod=h>30&&cr()<S.podium?1+Math.floor(cr()*3):0;
+  const glass=cr()<S.glass?.6+cr()*.4:cr()*.3;
+  const style=Math.floor(cr()*4);
+  const hue=(S.hue+(cr()-.5)*.14+1)%1;
+  const rgb=hsl2rgb(hue,S.sat*(.5+cr()*.7),Math.min(.85,(.45+cr()*.3)*S.bright*(.8+center*.3)));
+  const seed=cr();
+  const w=bw*(.72+cr()*.28),d=bw*(.72+cr()*.28);
+  const push=(arr,hh)=>{arr.push(bcx,0,bcz,0,w,hh,d,rot,style,pod,glass,seed,rgb[0],rgb[1],rgb[2],seed);};
+  push(full,h);
+  if(h>S.lodDist*.12)push(lod,h);
+  if(pod>0){const ph=pod*3.6;const pw=Math.min(w*1.45,bw),pd=Math.min(d*1.45,bw);
+   full.push(bcx,0,bcz,0,pw,ph,pd,rot,style,0,glass*.5,seed,rgb[0]*.9,rgb[1]*.9,rgb[2]*.9,seed);}
+  for(let k=0;k<4;k++){const sx=(k&1)?1:-1,sz=(k&2)?1:-1;
+   lamps.push(bcx+sx*(bw/2+S.roadWidth*.5-.8),7.34,bcz+sz*(bw/2+S.roadWidth*.5-.8),1);}
+ }
+ const ch={cx,cz,fullN:full.length/16,lodN:lod.length/16,lampN:lamps.length/4};
+ ch.fullBuf=buf(new Float32Array(full));
+ ch.vaoFull=makeBuildingVAO(ch.fullBuf);ch.vaoShadow=makeShadowVAO(ch.fullBuf);
+ if(ch.lodN){ch.lodBuf=buf(new Float32Array(lod));ch.vaoLod=makeBuildingVAO(ch.lodBuf);}
+ if(ch.lampN){ch.lampBuf=buf(new Float32Array(lamps));ch.vaoLamp=makeLampVAO(ch.lampBuf);}
+ return ch;}
+function disposeChunk(ch){for(const k of ['fullBuf','lodBuf','lampBuf'])if(ch[k])gl.deleteBuffer(ch[k]);
+ for(const k of ['vaoFull','vaoLod','vaoShadow','vaoLamp'])if(ch[k])gl.deleteVertexArray(ch[k]);}
+function updateChunks(){
+ const ccx=Math.floor(cam.tx/CHUNK),ccz=Math.floor(cam.tz/CHUNK);
+ const R=Math.ceil(S.drawDist/CHUNK)+1;
+ const need=new Set();
+ for(let i=-R;i<=R;i++)for(let j=-R;j<=R;j++){const key=(ccx+i)+','+(ccz+j);need.add(key);
+  if(!chunks.has(key)&&chunks.size<420)chunks.set(key,buildChunk(ccx+i,ccz+j));}
+ if(chunks.size>360)for(const [k,ch] of chunks)if(!need.has(k)){disposeChunk(ch);chunks.delete(k);}
+}
+function regenCity(){for(const ch of chunks.values())disposeChunk(ch);chunks.clear();
+ for(let i=0;i<cars.length;i++)cars[i]=spawnCar();}
+
+/* ================= 7. 车辆 / 粒子 ================= */
+const cars=[];
+function spawnCar(){
+ const cell=S.blockSize+S.roadWidth;
+ const k=Math.floor(Math.random()*44)-22;
+ const alongX=Math.random()<.5;
+ const roadC=(k+.5)*cell;
+ const off=(Math.random()<.5?-1:1)*(S.roadWidth*.18+.9);
+ const t=(Math.random()-.5)*2200;
+ const dir=off>0?1:-1;
+ const col=Math.random()<.12?[.85,.72,.15]:hsl2rgb(Math.random(),Math.random()*.5,.25+Math.random()*.4);
+ return {alongX,roadC,off,t,dir,speed:7+Math.random()*7,col};}
+for(let i=0;i<MAXCARS;i++)cars.push(spawnCar());
+const carData=new Float32Array(MAXCARS*8);
+function updateCars(dt){
+ const lim=S.drawDist*.7;
+ for(let i=0;i<MAXCARS;i++){const c=cars[i];
+  c.t+=c.dir*c.speed*S.carSpeed*dt;
+  if(Math.abs(c.t)>lim){cars[i]=spawnCar();continue;}
+  const wx=c.alongX?c.t:c.roadC+c.off;
+  const wz=c.alongX?c.roadC+c.off:c.t;
+  const rot=c.alongX?(c.dir>0?Math.PI/2:-Math.PI/2):(c.dir>0?0:Math.PI);
+  const o=i*8;carData[o]=wx;carData[o+1]=0;carData[o+2]=wz;carData[o+3]=0;
+  carData[o+4]=c.col[0];carData[o+5]=c.col[1];carData[o+6]=c.col[2];carData[o+7]=rot;}
+ gl.bindBuffer(gl.ARRAY_BUFFER,carBuf);gl.bufferSubData(gl.ARRAY_BUFFER,0,carData);}
+
+const rainArr=new Float32Array(MAXP*4),rainVel=new Float32Array(MAXP);
+const snowArr=new Float32Array(MAXP*4),snowVel=new Float32Array(MAXP),snowPh=new Float32Array(MAXP);
+for(let i=0;i<MAXP;i++){rainVel[i]=35+Math.random()*22;snowVel[i]=1.4+Math.random()*1.8;snowPh[i]=Math.random()*6.28;
+ rainArr[i*4]=0;rainArr[i*4+1]=Math.random()*160;rainArr[i*4+2]=0;rainArr[i*4+3]=Math.random();
+ snowArr[i*4]=0;snowArr[i*4+1]=Math.random()*120;snowArr[i*4+2]=0;snowArr[i*4+3]=.5+Math.random();}
+function updateParticles(dt,t){
+ const nr=Math.floor(MAXP*S.rain),ns=Math.floor(MAXP*S.snow);
+ const R=140;
+ for(let i=0;i<nr;i++){const o=i*4;
+  rainArr[o+1]-=rainVel[i]*dt;rainArr[o]+=S.windX*dt*10;rainArr[o+2]+=S.windZ*dt*10;
+  if(rainArr[o+1]<0){rainArr[o]=cam.tx+(Math.random()-.5)*2*R;rainArr[o+1]=90+Math.random()*70;
+   rainArr[o+2]=cam.tz+(Math.random()-.5)*2*R;}}
+ for(let i=0;i<ns;i++){const o=i*4;
+  snowArr[o+1]-=snowVel[i]*dt;
+  snowArr[o]+=Math.sin(t*.8+snowPh[i])*dt*.8+S.windX*dt*4;
+  snowArr[o+2]+=Math.cos(t*.7+snowPh[i])*dt*.8+S.windZ*dt*4;
+  if(snowArr[o+1]<0){snowArr[o]=cam.tx+(Math.random()-.5)*2*R;snowArr[o+1]=60+Math.random()*60;
+   snowArr[o+2]=cam.tz+(Math.random()-.5)*2*R;}}
+ gl.bindBuffer(gl.ARRAY_BUFFER,rainBuf);gl.bufferSubData(gl.ARRAY_BUFFER,0,rainArr.subarray(0,Math.max(1,nr)*4));
+ gl.bindBuffer(gl.ARRAY_BUFFER,snowBuf);gl.bufferSubData(gl.ARRAY_BUFFER,0,snowArr.subarray(0,Math.max(1,ns)*4));
+ return {nr,ns};}
+
+/* ================= 8. 相机与输入 ================= */
+const cam={theta:.6,phi:1.02,dist:430,tx:0,tz:0,ty:S.camH};
+function camPos(){const sp=Math.sin(cam.phi),cp=Math.cos(cam.phi);
+ return [cam.tx+cam.dist*sp*Math.sin(cam.theta),cam.ty+cam.dist*cp,cam.tz+cam.dist*sp*Math.cos(cam.theta)];}
+let drag=false,lx=0,ly=0;
+const panel=document.getElementById('panel');
+canvas.addEventListener('pointerdown',e=>{drag=true;lx=e.clientX;ly=e.clientY;canvas.classList.add('drag');});
+window.addEventListener('pointerup',()=>{drag=false;canvas.classList.remove('drag');});
+window.addEventListener('pointermove',e=>{if(!drag)return;
+ cam.theta-=(e.clientX-lx)*.005;cam.phi=Math.max(.08,Math.min(1.52,cam.phi-(e.clientY-ly)*.005));
+ lx=e.clientX;ly=e.clientY;});
+canvas.addEventListener('wheel',e=>{e.preventDefault();cam.dist=Math.max(30,Math.min(1600,cam.dist*Math.exp(e.deltaY*.001)));},{passive:false});
+const keys={};
+window.addEventListener('keydown',e=>{keys[e.code]=true;
+ if(e.code==='KeyH')panel.classList.toggle('hidden');
+ if(e.code==='KeyP'){S.paused=!S.paused;syncControl('paused');}});
+window.addEventListener('keyup',e=>keys[e.code]=false);
+function updateCam(dt){
+ if(S.autoRot>0&&!drag)cam.theta+=dt*S.autoRot*.12;
+ const sp=Math.sin(cam.theta),cp=Math.cos(cam.theta);
+ const f=[sp,0,cp],r=[cp,0,-sp];
+ const v=cam.dist*.55*dt*(keys.ShiftLeft?2.5:1);
+ if(keys.KeyW||keys.ArrowUp){cam.tx+=f[0]*v;cam.tz+=f[2]*v;}
+ if(keys.KeyS||keys.ArrowDown){cam.tx-=f[0]*v;cam.tz-=f[2]*v;}
+ if(keys.KeyA||keys.ArrowLeft){cam.tx-=r[0]*v;cam.tz-=r[2]*v;}
+ if(keys.KeyD||keys.ArrowRight){cam.tx+=r[0]*v;cam.tz+=r[2]*v;}
+ if(keys.KeyQ)cam.ty=Math.max(4,cam.ty-v);
+ if(keys.KeyE)cam.ty=Math.min(900,cam.ty+v);}
+
+/* ================= 9. 太阳 / 闪电 / 大气参数 ================= */
+function sunCalc(time){
+ const hr=(time-12)/24*Math.PI*2;
+ const dec=S.season*Math.PI/180,lat=40*Math.PI/180;
+ const sd=Math.sin(dec),cd=Math.cos(dec),sl=Math.sin(lat),cl=Math.cos(lat);
+ const alt=Math.asin(sd*sl+cd*cl*Math.cos(hr));
+ const az=Math.atan2(Math.sin(hr),Math.cos(hr)*sl-Math.tan(dec)*cl);
+ return {dir:[Math.cos(alt)*Math.sin(az),Math.sin(alt),Math.cos(alt)*Math.cos(az)],alt};}
+let bolt=0,boltTimer=2,boltDir=[0,.8,0];
+const flashEl=document.getElementById('flash');
+function updateLightning(dt){
+ bolt*=Math.exp(-dt*5.5);
+ if(S.lightning>0&&S.rain>.12){boltTimer-=dt;
+  if(boltTimer<=0){boltTimer=1.2+Math.random()*7/(S.lightning+.05);
+   bolt=1.5+Math.random()*2.2;
+   const a=Math.random()*6.28;boltDir=[Math.cos(a)*.5,.78,Math.sin(a)*.5];
+   flashEl.style.opacity=Math.min(.7,bolt*.28);setTimeout(()=>flashEl.style.opacity=0,90);}}}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const sstep=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t);};
+const lerp=(a,b,t)=>a+(b-a)*t;
+function norm3(v){const l=Math.hypot(v[0],v[1],v[2])||1;return[v[0]/l,v[1]/l,v[2]/l];}
+let wetEff=0;
+
+/* ================= 10. 渲染 ================= */
+let W=2,H=2,rw=2,rh=2;
+const sceneFBO={tex:null,fb:null,dt:null},bloomA={tex:null,fb:null},bloomB={tex:null,fb:null};
+function resize(){
+ const dpr=Math.min(window.devicePixelRatio||1,1.5);
+ W=Math.max(2,Math.floor(canvas.clientWidth*dpr));H=Math.max(2,Math.floor(canvas.clientHeight*dpr));
+ canvas.width=W;canvas.height=H;
+ const sc=SCALES[S.renderScale];
+ rw=Math.max(64,Math.floor(W*sc));rh=Math.max(64,Math.floor(H*sc));
+ allocFBO(sceneFBO,rw,rh,true);
+ allocFBO(bloomA,Math.max(2,rw>>1),Math.max(2,rh>>1),false);
+ allocFBO(bloomB,Math.max(2,rw>>1),Math.max(2,rh>>1),false);}
+window.addEventListener('resize',resize);
+
+function extractPlanes(m){const pl=[];
+ for(const s of [1,-1]){pl.push([m[3]+s*m[0],m[7]+s*m[4],m[11]+s*m[8],m[15]+s*m[12]]);
+  pl.push([m[3]+s*m[1],m[7]+s*m[5],m[11]+s*m[9],m[15]+s*m[13]]);}
+ pl.push([m[3]+m[2],m[7]+m[6],m[11]+m[10],m[15]+m[14]]);
+ pl.push([m[3]-m[2],m[7]-m[6],m[11]-m[10],m[15]-m[14]]);
+ return pl.map(p=>{const l=Math.hypot(p[0],p[1],p[2])||1;return[p[0]/l,p[1]/l,p[2]/l,p[3]/l];});}
+function sphereVisible(pl,x,y,z,r){for(const p of pl)if(p[0]*x+p[1]*y+p[2]*z+p[3]<-r)return false;return true;}
+
+function bindTex(unit,tex){gl.activeTexture(gl.TEXTURE0+unit);gl.bindTexture(gl.TEXTURE_2D,tex);}
+let drawnBuildings=0;
+
+function invert4(m){const o=new Float32Array(16);
+ const a00=m[0],a01=m[1],a02=m[2],a03=m[3],a10=m[4],a11=m[5],a12=m[6],a13=m[7],
+  a20=m[8],a21=m[9],a22=m[10],a23=m[11],a30=m[12],a31=m[13],a32=m[14],a33=m[15],
+  b00=a00*a11-a01*a10,b01=a00*a12-a02*a10,b02=a00*a13-a03*a10,b03=a01*a12-a02*a11,
+  b04=a01*a13-a03*a11,b05=a02*a13-a03*a12,b06=a20*a31-a21*a30,b07=a20*a32-a22*a30,
+  b08=a20*a33-a23*a30,b09=a21*a32-a22*a31,b10=a21*a33-a23*a31,b11=a22*a33-a23*a32;
+ let det=b00*b11-b01*b10+b02*b09+b03*b08-b04*b07+b05*b06;det=1/det;
+ o[0]=(a11*b11-a12*b10+a13*b09)*det;o[1]=(a02*b10-a01*b11-a03*b09)*det;
+ o[2]=(a31*b05-a32*b04+a33*b03)*det;o[3]=(a22*b04-a21*b05-a23*b03)*det;
+ o[4]=(a12*b08-a10*b11-a13*b07)*det;o[5]=(a00*b11-a02*b08+a03*b07)*det;
+ o[6]=(a32*b02-a30*b05-a33*b01)*det;o[7]=(a20*b05-a22*b02+a23*b01)*det;
+ o[8]=(a10*b10-a11*b08+a13*b06)*det;o[9]=(a01*b08-a00*b10-a03*b06)*det;
+ o[10]=(a30*b04-a31*b02+a33*b00)*det;o[11]=(a21*b02-a20*b05-a23*b00)*det;
+ o[12]=(a11*b07-a10*b09-a12*b06)*det;o[13]=(a00*b09-a01*b07+a02*b06)*det;
+ o[14]=(a31*b01-a30*b03-a32*b00)*det;o[15]=(a20*b03-a21*b01+a22*b00)*det;
+ return o;}
+
+let lastT=performance.now(),fpsAcc=0,fpsN=0,fpsT=0;
+
+function frame(now){
+ requestAnimationFrame(frame);
+ const dt=Math.min(.05,(now-lastT)/1000);lastT=now;
+ const t=now/1000;
+ if(!S.paused)S.time=(S.time+dt*S.timeSpeed/60)%24;
+ updateCam(dt);updateLightning(dt);
+ wetEff+=(Math.max(S.wet,S.rain)-wetEff)*Math.min(1,dt*.25);
+ updateChunks();updateCars(dt);
+ const parts=updateParticles(dt,t);
+ if(shadowFBO.size!==SHADOWS[S.shadowRes])allocShadow(SHADOWS[S.shadowRes]);
+
+ /* ---- 太阳 / 月亮 / 颜色 ---- */
+ const sun=sunCalc(S.time);
+ const sunDir=sun.dir;
+ const moonDir=norm3([-sunDir[0],-sunDir[1],-sunDir[2]]);
+ const alt=sun.alt;
+ const dayK=sstep(-.05,.35,alt);
+ const cloudAtten=1-S.cloudCover*.55;
+ const stt=clamp(alt*2.2,0,1);
+ let sunCol=[1,.35+.6*stt*stt,.12+.85*stt*stt*stt];
+ const scE=S.sunInt*(.12+.88*clamp(alt*3,0,1))*cloudAtten*(1+bolt*3);
+ sunCol=[sunCol[0]*scE*3.4,sunCol[1]*scE*3.4,sunCol[2]*scE*3.4];
+ const sunVis=sstep(-.03,.06,alt);
+ let amb=[(0.05+0.35*dayK)*(0.5+0.5*dayK),(0.07+0.45*dayK)*(0.5+0.5*dayK),(0.12+0.6*dayK)*(0.5+0.5*dayK)];
+ const lum=.2126*sunCol[0]+.7152*sunCol[1]+.0722*sunCol[2];
+ amb=amb.map(v=>v*S.ambient*(.35+.65*Math.min(1,lum/3))*cloudAtten);
+ const golden=clamp(1-Math.abs(alt)*4,0,1)*sstep(-.1,.05,alt);
+ amb=[amb[0]+sunCol[0]*.05*golden,amb[1]+sunCol[1]*.05*golden,amb[2]+sunCol[2]*.05*golden];
+ const bounce=[.09,.085,.08].map(v=>v*(lum*.5+amb[1])*S.bounce*2.2);
+ const bk=clamp(bolt*.5,0,.85);
+ const dirEff=bolt>.05?norm3([lerp(sunDir[0],boltDir[0],bk),lerp(sunDir[1],boltDir[1],bk),lerp(sunDir[2],boltDir[2],bk)]):sunDir;
+ const fogK=Math.pow(S.fog*.0022,2)*2.2;
+ const fogHInv=1/Math.max(S.fogH,10);
+
+ /* ---- 相机矩阵 ---- */
+ const eye=camPos();
+ const target=[cam.tx,cam.ty,cam.tz];
+ const proj=M4.persp(S.fov*Math.PI/180,rw/rh,.5,S.drawDist*1.3);
+ const view=M4.lookAt(eye,target,[0,1,0]);
+ const vp=M4.mul(proj,view);
+ const invVP=invert4(vp);
+ const planes=extractPlanes(vp);
+
+ /* ---- 阴影矩阵 ---- */
+ const ext=S.shadowDist;
+ const snap=2*ext/shadowFBO.size;
+ const scx=Math.round(cam.tx/snap)*snap,scz=Math.round(cam.tz/snap)*snap;
+ const bas=basis(dirEff);
+ const sEye=[scx-dirEff[0]*ext*1.5,ext*.3+dirEff[1]*ext*1.5,scz-dirEff[2]*ext*1.5];
+ const sView=M4.lookAt(sEye,[scx,0,scz],[bas[3],bas[4],bas[5]]);
+ const sProj=M4.ortho(-ext,ext,-ext,ext,ext*.1,ext*3.4);
+ const shadowVP=M4.mul(sProj,sView);
+
+ /* ---- Pass 1: 阴影 ---- */
+ const doShadow=lum>0.02||bolt>0.1;
+ if(doShadow){
+ gl.bindFramebuffer(gl.FRAMEBUFFER,shadowFBO.fb);
+ gl.viewport(0,0,shadowFBO.size,shadowFBO.size);
+ gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);
+ gl.clear(gl.DEPTH_BUFFER_BIT);
+ gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(2,4);
+ gl.disable(gl.BLEND);
+ gl.useProgram(P.shadow);
+ su(P.shadow,'uProj',sProj);su(P.shadow,'uView',sView);
+ for(const ch of chunks.values()){
+  const dx=ch.cx*CHUNK+160-cam.tx,dz=ch.cz*CHUNK+160-cam.tz;
+  if(dx*dx+dz*dz>Math.pow(ext+CHUNK*1.2,2))continue;
+  gl.bindVertexArray(ch.vaoShadow);gl.drawArraysInstanced(gl.TRIANGLES,0,36,ch.fullN);}
+ gl.disable(gl.POLYGON_OFFSET_FILL);}
+
+ /* ---- Pass 2: 场景 ---- */
+ gl.bindFramebuffer(gl.FRAMEBUFFER,sceneFBO.fb);
+ gl.viewport(0,0,rw,rh);
+ gl.clearColor(0,0,0,1);
+ gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+ gl.disable(gl.BLEND);
+ const camR=[view[0],view[4],view[8]];
+ const camU=[view[1],view[5],view[9]];
+
+ // 天空
+ gl.depthMask(false);
+ gl.useProgram(P.sky);
+ su(P.sky,'uInvVP',invVP);su(P.sky,'uCamPos',eye);su(P.sky,'uSunDir',sunDir);su(P.sky,'uMoonDir',moonDir);
+ su(P.sky,'uSunCol',sunCol);su(P.sky,'uTime',t);su(P.sky,'uCamFar',S.drawDist*1.3);
+ su(P.sky,'uCloudCover',S.cloudCover);su(P.sky,'uCloudScale',S.cloudScale);su(P.sky,'uCloudSpeed',S.cloudSpeed);
+ su(P.sky,'uCloudH',S.cloudH);su(P.sky,'uStars',S.stars);su(P.sky,'uMoonSize',S.moonSize);
+ su(P.sky,'uSunVis',sunVis);su(P.sky,'uTurb',S.turbidity);su(P.sky,'uSunInt',S.sunBoost*(1-S.cloudCover*.45));
+ gl.drawArrays(gl.TRIANGLES,0,3);
+ gl.depthMask(true);
+
+ // 地面
+ gl.useProgram(P.ground);
+ su(P.ground,'uProj',proj);su(P.ground,'uView',view);su(P.ground,'uInvVP',invVP);
+ su(P.ground,'uCamPos',eye);su(P.ground,'uCamFar',S.drawDist*1.3);
+ su(P.ground,'uBlock',S.blockSize);su(P.ground,'uRoad',S.roadWidth);
+ su(P.ground,'uSunDir',dirEff);su(P.ground,'uMoonDir',moonDir);su(P.ground,'uSunCol',sunCol);
+ su(P.ground,'uAmbCol',amb);su(P.ground,'uBounceCol',bounce);su(P.ground,'uWet',wetEff);
+ su(P.ground,'uTime',t);su(P.ground,'uStars',S.stars);su(P.ground,'uMoonSize',S.moonSize);
+ su(P.ground,'uSunVis',sunVis);su(P.ground,'uTurb',S.turbidity);su(P.ground,'uSunInt',S.sunBoost);
+ su(P.ground,'uFogK',fogK);su(P.ground,'uFogHInv',fogHInv);
+ su(P.ground,'uStreetInt',S.streetInt);su(P.ground,'uWarmth',S.warmth);
+ su(P.ground,'uShadowPl',shadowVP);sui(P.ground,'uShadowMap',0);
+ su(P.ground,'uShadowSoft',S.shadowSoft);su(P.ground,'uShadowTexel',1/shadowFBO.size);
+ su(P.ground,'uShadowBias',S.acne);
+ bindTex(0,shadowFBO.tex);
+ gl.bindVertexArray(groundVAO);gl.drawArrays(gl.TRIANGLES,0,6);
+
+ // 建筑
+ gl.useProgram(P.build);
+ su(P.build,'uProj',proj);su(P.build,'uView',view);su(P.build,'uInvVP',invVP);
+ su(P.build,'uCamPos',eye);su(P.build,'uCamFar',S.drawDist*1.3);
+ su(P.build,'uSunDir',dirEff);su(P.build,'uMoonDir',moonDir);su(P.build,'uSunCol',sunCol);
+ su(P.build,'uAmbCol',amb);su(P.build,'uBounceCol',bounce);su(P.build,'uWet',wetEff);
+ su(P.build,'uTime',t);su(P.build,'uStars',S.stars);su(P.build,'uMoonSize',S.moonSize);
+ su(P.build,'uSunVis',sunVis);su(P.build,'uTurb',S.turbidity);su(P.build,'uSunInt',S.sunBoost);
+ su(P.build,'uFogK',fogK);su(P.build,'uFogHInv',fogHInv);
+ su(P.build,'uWinGlow',S.winGlow);su(P.build,'uLitProb',S.litProb);su(P.build,'uWarmth',S.warmth);
+ su(P.build,'uNeonInt',S.neonInt);su(P.build,'uRoofDet',S.roofDet);su(P.build,'uAntenna',S.antenna);
+ su(P.build,'uWinDens',S.winDens);
+ su(P.build,'uShadowPl',shadowVP);sui(P.build,'uShadowMap',0);
+ su(P.build,'uShadowSoft',S.shadowSoft);su(P.build,'uShadowTexel',1/shadowFBO.size);
+ su(P.build,'uShadowBias',S.acne);
+ bindTex(0,shadowFBO.tex);
+ drawnBuildings=0;
+ for(const ch of chunks.values()){
+  const cx=ch.cx*CHUNK+160,cz=ch.cz*CHUNK+160;
+  if(!sphereVisible(planes,cx,120,cz,400))continue;
+  const d=Math.hypot(cx-cam.tx,cz-cam.tz);
+  if(d>S.drawDist+CHUNK)continue;
+  if(d>S.lodDist&&ch.vaoLod){gl.bindVertexArray(ch.vaoLod);gl.drawArraysInstanced(gl.TRIANGLES,0,36,ch.lodN);drawnBuildings+=ch.lodN;}
+  else{gl.bindVertexArray(ch.vaoFull);gl.drawArraysInstanced(gl.TRIANGLES,0,36,ch.fullN);drawnBuildings+=ch.fullN;}}
+
+ // 路灯头
+ gl.useProgram(P.lamp);
+ su(P.lamp,'uProj',proj);su(P.lamp,'uView',view);
+ su(P.lamp,'uSunDir',dirEff);su(P.lamp,'uCamPos',eye);
+ su(P.lamp,'uStreetInt',S.streetInt);su(P.lamp,'uWarmth',S.warmth);
+ for(const ch of chunks.values()){if(!ch.vaoLamp)continue;
+  const cx=ch.cx*CHUNK+160,cz=ch.cz*CHUNK+160;
+  const d=Math.hypot(cx-cam.tx,cz-cam.tz);
+  if(d>420)continue;
+  gl.bindVertexArray(ch.vaoLamp);gl.drawArraysInstanced(gl.TRIANGLES,0,36,ch.lampN);}
+
+ // 车辆
+ const carCount=Math.floor(MAXCARS*S.carDens);
+ if(carCount>0){
+  gl.useProgram(P.car);
+  su(P.car,'uProj',proj);su(P.car,'uView',view);su(P.car,'uInvVP',invVP);
+  su(P.car,'uCamPos',eye);su(P.car,'uCamFar',S.drawDist*1.3);
+  su(P.car,'uSunDir',dirEff);su(P.car,'uMoonDir',moonDir);su(P.car,'uSunCol',sunCol);
+  su(P.car,'uAmbCol',amb);su(P.car,'uBounceCol',bounce);su(P.car,'uWet',wetEff);
+  su(P.car,'uTime',t);su(P.car,'uStars',S.stars);su(P.car,'uMoonSize',S.moonSize);
+  su(P.car,'uSunVis',sunVis);su(P.car,'uTurb',S.turbidity);su(P.car,'uSunInt',S.sunBoost);
+  su(P.car,'uFogK',fogK);su(P.car,'uFogHInv',fogHInv);
+  su(P.car,'uShadowPl',shadowVP);sui(P.car,'uShadowMap',0);
+  su(P.car,'uShadowSoft',S.shadowSoft);su(P.car,'uShadowTexel',1/shadowFBO.size);
+  su(P.car,'uShadowBias',S.acne);
+  bindTex(0,shadowFBO.tex);
+  gl.bindVertexArray(carVAO);gl.drawArraysInstanced(gl.TRIANGLES,0,36,carCount);}
+
+ // 雨 / 雪
+ gl.enable(gl.BLEND);gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);gl.depthMask(false);
+ if(parts.nr>0){gl.useProgram(P.rain);
+  su(P.rain,'uProj',proj);su(P.rain,'uView',view);su(P.rain,'uCamRight',camR);su(P.rain,'uCamUp',camU);
+  su(P.rain,'uRainInt',S.rain);su(P.rain,'uSunCol',sunCol);
+  gl.bindVertexArray(rainVAO);gl.drawArraysInstanced(gl.TRIANGLES,0,6,parts.nr);}
+ if(parts.ns>0){gl.useProgram(P.snow);
+  su(P.snow,'uProj',proj);su(P.snow,'uView',view);su(P.snow,'uCamRight',camR);su(P.snow,'uCamUp',camU);
+  su(P.snow,'uSnowInt',S.snow);su(P.snow,'uTime',t);
+  gl.bindVertexArray(snowVAO);gl.drawArraysInstanced(gl.TRIANGLES,0,6,parts.ns);}
+ gl.depthMask(true);gl.disable(gl.BLEND);
+
+ /* ---- Pass 3: 泛光 ---- */
+ gl.disable(gl.DEPTH_TEST);
+ const bw=bloomA.w,bh=bloomA.h;
+ gl.useProgram(P.bright);
+ bindTex(0,sceneFBO.tex);sui(P.bright,'uTex',0);su(P.bright,'uThr',S.bloomThr);
+ gl.bindFramebuffer(gl.FRAMEBUFFER,bloomA.fb);gl.viewport(0,0,bw,bh);gl.drawArrays(gl.TRIANGLES,0,3);
+ gl.useProgram(P.blur);sui(P.blur,'uTex',0);
+ const rad=S.bloomRad;
+ for(const m of [1,2]){
+  bindTex(0,bloomA.tex);su(P.blur,'uDir',[rad*m/bw,0]);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,bloomB.fb);gl.viewport(0,0,bw,bh);gl.drawArrays(gl.TRIANGLES,0,3);
+  bindTex(0,bloomB.tex);su(P.blur,'uDir',[0,rad*m/bh]);
+  gl.bindFramebuffer(gl.FRAMEBUFFER,bloomA.fb);gl.viewport(0,0,bw,bh);gl.drawArrays(gl.TRIANGLES,0,3);}
+
+ /* ---- Pass 4: 合成输出 ---- */
+ gl.bindFramebuffer(gl.FRAMEBUFFER,null);
+ gl.viewport(0,0,W,H);
+ gl.useProgram(P.post);
+ bindTex(0,sceneFBO.tex);bindTex(1,bloomA.tex);bindTex(2,sceneFBO.dt);
+ sui(P.post,'uScene',0);sui(P.post,'uBloomT',1);sui(P.post,'uDepthT',2);
+ su(P.post,'uExposure',S.exposure);su(P.post,'uTonemap',S.tonemap);su(P.post,'uSat',S.saturation);
+ su(P.post,'uContrast',S.contrast);su(P.post,'uTint',S.tint);su(P.post,'uBloomInt',S.bloomInt);
+ su(P.post,'uVig',S.vignette);su(P.post,'uGrain',S.grain);su(P.post,'uChroma',S.chroma);
+ su(P.post,'uTime',t);su(P.post,'uDofOn',S.dof?1:0);su(P.post,'uFocus',S.focus);
+ su(P.post,'uDofAmt',S.dofAmt);su(P.post,'uCamNear',.5);su(P.post,'uCamFar',S.drawDist*1.3);
+ su(P.post,'uFxaaOn',S.fxaa?1:0);su(P.post,'uTexel',[1/rw,1/rh]);
+ gl.drawArrays(gl.TRIANGLES,0,3);
+
+ /* ---- 统计 ---- */
+ fpsN++;fpsAcc+=dt;
+ if(now-fpsT>500){
+  const fps=Math.round(fpsN/Math.max(fpsAcc,.001));fpsN=0;fpsAcc=0;fpsT=now;
+  elFps.textContent=fps;elBc.textContent=drawnBuildings;elCc.textContent=chunks.size;
+  const hh=Math.floor(S.time),mm=Math.floor((S.time%1)*60);
+  clockEl.textContent=(alt>0?'☀ ':'☾ ')+String(hh).padStart(2,'0')+':'+String(mm).padStart(2,'0');
+  if(Math.abs(S.camH-cam.ty)>2){S.camH=Math.round(cam.ty);syncControl('camH');}
+ }
+}
+
+/* ================= 11. UI 构建 / 预设 ================= */
+const clockEl=document.getElementById('clock');
+let elFps,elBc,elCc;
+const REGEN_KEYS=new Set(['density','heightScale','heightVar','downtown','blockSize','roadWidth','hue','sat','bright','glass','winDens','podium','rotJitter']);
+function fmt(d,v){return d.st>=1?String(Math.round(v)):v.toFixed(2);}
+function buildUI(){
+ let html='<div id="phead"><h1>无尽都市 · ENDLESS METROPOLIS</h1><div class="sub">WebGL2 程序化城市实时渲染器 · 大气散射 · 动态昼夜</div>'+
+  '<div id="stats"><span>FPS <b id="fps">--</b></span><span>建筑 <b id="bcount">--</b></span><span>区块 <b id="ccount">--</b></span></div>'+
+  '<div id="presets"></div></div>';
+ for(const [gid,gname] of GROUPS){
+  html+='<div class="sec" id="sec-'+gid+'"><h3>'+gname+'<span>▼</span></h3><div class="body">';
+  for(const d of DEFS.filter(x=>x.g===gid)){
+   if(d.t==='r')html+='<div class="ctl"><label>'+d.label+'</label><input type="range" data-k="'+d.k+'" min="'+d.min+'" max="'+d.max+'" step="'+d.st+'" value="'+d.v+'"><span class="val" id="v-'+d.k+'">'+fmt(d,d.v)+'</span></div>';
+   else if(d.t==='b')html+='<label class="tgl"><input type="checkbox" data-k="'+d.k+'" '+(d.v?'checked':'')+'><span class="sw"></span><em>'+d.label+'</em></label>';
+   else if(d.t==='s')html+='<div class="ctl"><label>'+d.label+'</label><select data-k="'+d.k+'">'+d.opts.map((o,i)=>'<option value="'+i+'" '+(i===d.v?'selected':'')+'>'+o+'</option>').join('')+'</select></div>';
+   else if(d.t==='btn')html+='<div class="btnrow"><button class="btn" data-act="regen">'+d.label+'</button></div>';
+   else if(d.t==='btn2')html+='<div class="btnrow"><button class="btn ghost" data-act="resetCam">'+d.label+'</button></div>';}
+  html+='</div></div>';}
+ panel.innerHTML=html;
+ elFps=document.getElementById('fps');elBc=document.getElementById('bcount');elCc=document.getElementById('ccount');
+ panel.addEventListener('input',e=>{const k=e.target.dataset.k;if(!k)return;
+  const d=DEFS.find(x=>x.k===k);
+  if(d.t==='b')S[k]=e.target.checked;
+  else if(d.t==='s')S[k]=+e.target.value;
+  else{S[k]=+e.target.value;const v=document.getElementById('v-'+k);if(v)v.textContent=fmt(d,S[k]);}
+  if(k==='camH')cam.ty=S.camH;
+  if(k==='renderScale')resize();});
+ panel.addEventListener('change',e=>{const k=e.target.dataset.k;
+  if(k&&REGEN_KEYS.has(k))regenCity();});
+ panel.addEventListener('click',e=>{
+  const h=e.target.closest('h3');if(h){h.parentElement.classList.toggle('closed');return;}
+  const bt=e.target.closest('button[data-act]');if(!bt)return;
+  if(bt.dataset.act==='regen'){S.seed=(Math.random()*1e9)|0;regenCity();}
+  if(bt.dataset.act==='resetCam'){cam.theta=.6;cam.phi=1.02;cam.dist=430;cam.tx=0;cam.tz=0;cam.ty=S.camH;}});
+ const pdiv=document.getElementById('presets');
+ for(const p of PRESETS){const b=document.createElement('button');b.textContent=p.n;b.onclick=()=>applyPreset(p);pdiv.appendChild(b);}}
+function syncControl(k){const el=panel.querySelector('[data-k="'+k+'"]');if(!el)return;
+ const d=DEFS.find(x=>x.k===k);
+ if(d.t==='b')el.checked=S[k];
+ else{el.value=S[k];const v=document.getElementById('v-'+k);if(v)v.textContent=fmt(d,S[k]);}}
+const PRESETS=[
+ {n:'黄金时刻',p:{time:18.1,timeSpeed:10,cloudCover:.22,fog:.3,exposure:1.1,bloomInt:1.1,rain:0,snow:0,lightning:0,wet:.15,neonInt:1.2,winGlow:1.4,season:10,turbidity:3.2,vignette:.35,carDens:.6,stars:.6}},
+ {n:'赛博之夜',p:{time:22.6,timeSpeed:6,cloudCover:.15,fog:.5,exposure:1.25,bloomInt:1.6,neonInt:2.6,winGlow:1.8,litProb:.7,carDens:.85,wet:.55,rain:.12,streetInt:1.6,chroma:.7,vignette:.45,stars:1.2}},
+ {n:'暴雨午夜',p:{time:1.2,rain:.9,lightning:.7,cloudCover:.95,fog:.8,wet:1,exposure:1.15,bloomInt:1.2,winGlow:1.1,streetInt:1.8,carDens:.4,stars:0,turbidity:4,snow:0}},
+ {n:'清晨薄雾',p:{time:6.4,timeSpeed:8,cloudCover:.12,fog:1.1,fogH:90,exposure:1.05,bloomInt:.9,winGlow:.9,stars:.3,season:5,turbidity:2.2,wet:.2,rain:0,snow:0}},
+ {n:'飞雪黄昏',p:{time:16.8,snow:.85,cloudCover:.7,fog:.55,exposure:1.1,winGlow:1.6,streetInt:1.7,season:-20,turbidity:2,wet:0,carDens:.45,rain:0,lightning:0}},
+ {n:'烈日正午',p:{time:12.2,cloudCover:.18,fog:.15,exposure:.95,sunInt:1.4,ambient:1.15,bloomInt:.55,season:20,turbidity:1.8,rain:0,snow:0,wet:0,stars:0,lightning:0}}];
+function applyPreset(pr){for(const k in pr.p){S[k]=pr.p[k];syncControl(k);}wetEff=Math.max(wetEff,S.wet);}
+
+/* ================= 12. 启动 ================= */
+buildUI();
+allocShadow(SHADOWS[S.shadowRes]);
+resize();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
