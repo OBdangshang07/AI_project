@@ -1,0 +1,18 @@
+00-hero: [{"id":"act-warp","top":99,"bottom":548,"overflow":-306}]
+01: [{"id":"act-warp","top":-274,"bottom":175,"overflow":-679},{"id":"act-thread","top":175,"bottom":836,"overflow":-18}]
+02-thread: [{"id":"act-thread","top":-71,"bottom":590,"overflow":-264},{"id":"act-pick","top":590,"bottom":1281,"overflow":427}]
+03-pick: [{"id":"act-pick","top":99,"bottom":790,"overflow":-64}]
+04: [{"id":"act-pick","top":-34,"bottom":657,"overflow":-197},{"id":"act-unweave","top":657,"bottom":988,"overflow":134}]
+05-flaw: [{"id":"act-unweave","top":99,"bottom":430,"overflow":-424}]
+06-stop: [{"id":"act-unweave","top":99,"bottom":430,"overflow":-424}]
+07-unweave: [{"id":"act-unweave","top":99,"bottom":430,"overflow":-424},{"id":"act-reverse","top":585,"bottom":1045,"overflow":191}]
+08-relearn: [{"id":"act-reverse","top":99,"bottom":559,"overflow":-295}]
+09-reverse: [{"id":"act-reverse","top":99,"bottom":559,"overflow":-295},{"id":"act-cutoff","top":646,"bottom":1257,"overflow":403}]
+10: [{"id":"act-cutoff","top":99,"bottom":710,"overflow":-144}]
+11-cut: [{"id":"act-cutoff","top":99,"bottom":710,"overflow":-144}]
+12-empty: [{"id":"act-cutoff","top":-168,"bottom":443,"overflow":-411}]
+13-colophon: []
+TAB: A.index__item|I绷经 → A.index__item|II穿综 → A.index__item|III投梭 → A.index__item|IV拆纬 → A.index__item|V反面 → A.index__item|VI落布 → BUTTON.chip|开声音 → BUTTON.chip|连续运转 → BUTTON.discovery|你把整幅经线扫过去了。「私」
+
+ERRORS:
+none

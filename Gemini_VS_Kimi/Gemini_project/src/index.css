@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg-dark: #070709;
+    --accent-blue: #0066ff;
+    --accent-cyan: #00f0ff;
+    --accent-violet: #8a2be2;
+    --accent-gold: #ffb800;
+  }
+
+  body {
+    background-color: var(--bg-dark);
+    color: #f3f4f6;
+    overflow-x: hidden;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+}
+
+/* Custom noise grain overlay */
+.bg-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.03'/%3E%3C/svg%3E");
+}
+
+/* Glassmorphism editorial border */
+.border-glass {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.border-glass-bright {
+  border: 1px solid rgba(0, 240, 255, 0.25);
+}
+
+/* Bespoke subtle glow */
+.glow-cyan {
+  box-shadow: 0 0 30px -5px rgba(0, 240, 255, 0.2);
+}
+
+.glow-blue {
+  box-shadow: 0 0 40px -5px rgba(0, 102, 255, 0.3);
+}
+
+/* Custom minimalist scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #070709;
+}
+::-webkit-scrollbar-thumb {
+  background: #1f2029;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #0066ff;
+}
+
+/* Font utilities */
+.font-display {
+  font-family: 'Space Grotesk', sans-serif;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+}
+
+/* Text stroke effect for editorial headings */
+.text-stroke {
+  -webkit-text-stroke: 1px rgba(255, 255, 255, 0.2);
+  color: transparent;
+}
+
+.text-stroke-hover:hover {
+  -webkit-text-stroke: 1px rgba(0, 240, 255, 0.8);
+  color: #ffffff;
+  transition: all 0.3s ease;
+}
