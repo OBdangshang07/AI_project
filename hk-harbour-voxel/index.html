@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>维多利亚港 · 体素数字沙盘 | VOXEL VICTORIA HARBOUR</title>
+<style>
+  :root{
+    --bg:#070a10; --panel:rgba(10,15,22,.72); --line:rgba(126,214,255,.18);
+    --txt:#dceaf5; --dim:#8ba3b8; --acc:#5fd8ff; --acc2:#ff6fb5; --gold:#ffcc73;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);overflow:hidden;
+    font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",-apple-system,"Segoe UI",sans-serif;
+    -webkit-font-smoothing:antialiased;user-select:none}
+  canvas#c{position:fixed;inset:0;width:100%;height:100%;display:block}
+  .hide-ui .ui{opacity:0;pointer-events:none}
+  .ui{transition:opacity .25s}
+
+  /* ---------- 顶栏 ---------- */
+  #top{position:fixed;left:0;right:0;top:0;height:52px;display:flex;align-items:center;gap:16px;
+    padding:0 16px;background:linear-gradient(180deg,rgba(4,7,12,.86),rgba(4,7,12,0));z-index:20}
+  #top .brand{display:flex;align-items:baseline;gap:10px;letter-spacing:.5px}
+  #top .brand b{font-size:16px;font-weight:700}
+  #top .brand i{font-size:10.5px;color:var(--dim);font-style:normal;letter-spacing:2px}
+  #top .brand .dot{width:7px;height:7px;border-radius:50%;background:var(--acc);
+    box-shadow:0 0 12px var(--acc);animation:pulse 2.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  #clockBox{display:flex;align-items:baseline;gap:8px;margin-left:6px;padding:3px 10px;border:1px solid var(--line);
+    border-radius:999px;background:rgba(8,14,22,.6)}
+  #clock{font-variant-numeric:tabular-nums;font-size:15px;color:var(--gold);letter-spacing:1px}
+  #clockName{font-size:11px;color:var(--dim)}
+  #stats{margin-left:auto;display:flex;gap:14px;font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+  #stats span{white-space:nowrap}
+  #coord{font-size:11px;color:var(--dim);font-variant-numeric:tabular-nums}
+  #compass{font-size:11px;color:var(--acc);min-width:52px;text-align:right}
+
+  /* ---------- 左侧控制台 ---------- */
+  #left{position:fixed;left:14px;top:64px;width:268px;max-height:calc(100vh - 120px);overflow:auto;
+    background:var(--panel);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:14px;
+    padding:12px;z-index:20;scrollbar-width:thin}
+  #left::-webkit-scrollbar{width:6px}
+  #left::-webkit-scrollbar-thumb{background:rgba(126,214,255,.22);border-radius:3px}
+  .sec{margin-bottom:14px}
+  .sec>h4{margin:0 0 7px;font-size:10.5px;font-weight:600;letter-spacing:1.6px;color:var(--acc);
+    text-transform:uppercase;display:flex;align-items:center;gap:6px}
+  .sec>h4:before{content:'';width:12px;height:1px;background:var(--acc);opacity:.7}
+  #modes{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .mode{display:flex;flex-direction:column;align-items:flex-start;gap:1px;padding:7px 9px;border-radius:9px;
+    border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.03);color:var(--txt);cursor:pointer;
+    transition:.16s;font-family:inherit}
+  .mode b{font-size:12.5px;font-weight:600}
+  .mode span{font-size:9px;color:var(--dim);letter-spacing:.6px}
+  .mode:hover{background:rgba(95,216,255,.10);border-color:rgba(95,216,255,.35)}
+  .mode.on{background:linear-gradient(135deg,rgba(95,216,255,.22),rgba(255,111,181,.14));
+    border-color:var(--acc);box-shadow:0 0 0 1px rgba(95,216,255,.25) inset}
+  .row{display:flex;align-items:center;gap:8px}
+  input[type=range]{-webkit-appearance:none;width:100%;height:3px;border-radius:2px;
+    background:linear-gradient(90deg,#1b2b3a,#3d6c86);outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;height:13px;border-radius:50%;
+    background:var(--acc);box-shadow:0 0 10px rgba(95,216,255,.8);cursor:pointer}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+  .chip{padding:4px 9px;font-size:11px;border-radius:999px;border:1px solid rgba(255,255,255,.1);
+    background:rgba(255,255,255,.03);color:var(--dim);cursor:pointer;transition:.15s;font-family:inherit}
+  .chip:hover{color:var(--txt);border-color:rgba(95,216,255,.4)}
+  .chip.on{background:rgba(95,216,255,.18);border-color:var(--acc);color:#eaf9ff}
+  select{background:rgba(8,14,22,.8);color:var(--txt);border:1px solid var(--line);border-radius:7px;
+    padding:3px 6px;font-size:11px;font-family:inherit}
+  #search{width:100%;padding:6px 9px;border-radius:8px;border:1px solid var(--line);
+    background:rgba(4,8,14,.7);color:var(--txt);font-size:12px;font-family:inherit;margin-bottom:6px}
+  #lmList{max-height:210px;overflow:auto;padding-right:2px}
+  #lmList::-webkit-scrollbar{width:5px}
+  #lmList::-webkit-scrollbar-thumb{background:rgba(126,214,255,.2);border-radius:3px}
+  .lmGroup{font-size:9.5px;letter-spacing:1.4px;color:var(--acc2);margin:8px 0 4px;opacity:.85}
+  .lmItem{display:flex;justify-content:space-between;align-items:center;width:100%;gap:8px;padding:5px 8px;
+    border-radius:7px;border:1px solid transparent;background:transparent;color:var(--txt);cursor:pointer;
+    font-size:12px;text-align:left;font-family:inherit}
+  .lmItem:hover{background:rgba(95,216,255,.12);border-color:rgba(95,216,255,.3)}
+  .lmItem .ht{font-size:10px;color:var(--dim);font-variant-numeric:tabular-nums}
+  #tip{font-size:10.5px;line-height:1.6;color:var(--dim);border-left:2px solid rgba(255,204,115,.5);
+    padding-left:8px;margin-top:2px}
+
+  /* ---------- 右侧：小地图 + 信息卡 ---------- */
+  #right{position:fixed;right:14px;top:64px;width:262px;display:flex;flex-direction:column;gap:10px;z-index:20}
+  .card{background:var(--panel);backdrop-filter:blur(14px);border:1px solid var(--line);border-radius:14px;padding:10px}
+  #mini{width:100%;display:block;border-radius:9px;background:#05080d;cursor:crosshair}
+  .minihead{display:flex;justify-content:space-between;align-items:center;font-size:9.5px;letter-spacing:1.4px;
+    color:var(--acc);margin-bottom:6px}
+  #info{display:none}
+  #info.on{display:block}
+  .ihead{margin-bottom:8px}
+  .ihead b{display:block;font-size:15px;letter-spacing:.4px}
+  .ihead i{font-style:normal;font-size:10px;color:var(--dim);letter-spacing:.8px}
+  .irow{display:flex;justify-content:space-between;font-size:11.5px;padding:2.5px 0;border-bottom:1px dashed rgba(255,255,255,.07)}
+  .irow span{color:var(--dim)}
+  .irow em{font-style:normal;color:var(--gold);font-variant-numeric:tabular-nums}
+  .idesc{font-size:11px;line-height:1.65;color:#b9cddc;margin:8px 0 9px}
+  .ibtns{display:flex;gap:6px}
+  .ibtns button{flex:1;padding:6px;border-radius:8px;border:1px solid rgba(95,216,255,.35);
+    background:rgba(95,216,255,.12);color:#eaf9ff;font-size:11px;cursor:pointer;font-family:inherit}
+  .ibtns button:hover{background:rgba(95,216,255,.24)}
+
+  /* ---------- 底部提示 ---------- */
+  #bottom{position:fixed;left:0;right:0;bottom:0;padding:10px 16px 12px;display:flex;justify-content:center;
+    gap:18px;align-items:center;background:linear-gradient(0deg,rgba(4,7,12,.8),rgba(4,7,12,0));z-index:20}
+  #hint{font-size:11px;color:var(--dim)}
+  #hint b{color:var(--acc);font-weight:600}
+
+  /* ---------- 3D 标签 ---------- */
+  #labels{position:fixed;inset:0;pointer-events:none;z-index:15}
+  .label{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;white-space:nowrap;
+    padding:3px 8px 4px;border-radius:8px;background:rgba(6,10,16,.62);border:1px solid rgba(126,214,255,.22);
+    backdrop-filter:blur(4px);transition:opacity .2s}
+  .label b{display:block;font-size:11.5px;font-weight:600;letter-spacing:.3px}
+  .label span{font-size:8.6px;color:var(--dim);letter-spacing:.6px}
+  .label i{position:absolute;left:50%;bottom:-9px;width:1px;height:9px;background:linear-gradient(180deg,rgba(126,214,255,.8),transparent)}
+  .label:hover{border-color:var(--acc);background:rgba(10,20,30,.86)}
+  .label.sel{border-color:var(--acc2);box-shadow:0 0 16px rgba(255,111,181,.35)}
+
+  /* ---------- 十字准星 ---------- */
+  #cross{position:fixed;left:50%;top:50%;width:14px;height:14px;margin:-7px 0 0 -7px;z-index:16;display:none}
+  body.fp #cross{display:block}
+  #cross:before,#cross:after{content:'';position:absolute;background:rgba(255,255,255,.75)}
+  #cross:before{left:6px;top:0;width:1px;height:14px}
+  #cross:after{top:6px;left:0;height:1px;width:14px}
+
+  /* ---------- 加载页 ---------- */
+  #loading{position:fixed;inset:0;z-index:60;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:16px;background:radial-gradient(1200px 700px at 50% 40%,#0d1826,#05080d 70%);
+    transition:opacity .8s}
+  #loading.done{opacity:0}
+  #loading h1{margin:0;font-size:28px;letter-spacing:5px;font-weight:300}
+  #loading h1 b{font-weight:700;color:var(--acc)}
+  #loading .sub{font-size:10.5px;letter-spacing:4px;color:var(--dim);text-transform:uppercase}
+  .lbar{width:min(460px,70vw);height:2px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden}
+  .lbar>i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--acc2));
+    box-shadow:0 0 14px var(--acc);transition:width .3s}
+  .lmsg{font-size:12px;color:var(--txt)}
+  .lpct{font-size:10px;color:var(--dim);font-variant-numeric:tabular-nums}
+  .skyline{width:min(560px,80vw);height:74px;opacity:.5}
+  pre#probe{position:fixed;left:0;top:0;z-index:80;color:#8f8;background:#000;font:10px/10px monospace;margin:0}
+
+  @media (max-width:1080px){#left{width:236px}#right{width:216px}}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="labels" class="ui"></div>
+<div id="cross"></div>
+
+<div id="top" class="ui">
+  <div class="brand"><span class="dot"></span><b>维多利亚港 · 体素数字沙盘</b><i>VOXEL VICTORIA HARBOUR</i></div>
+  <div id="clockBox"><span id="clock">18:36</span><span id="clockName">黄金时刻</span></div>
+  <div id="compass">北 N</div>
+  <div id="stats"></div>
+</div>
+
+<div id="left" class="ui">
+  <div class="sec">
+    <h4>视角 View</h4>
+    <div id="modes"></div>
+  </div>
+  <div class="sec">
+    <h4>经典机位 Viewpoints</h4>
+    <div class="chips" id="views"></div>
+  </div>
+  <div class="sec">
+    <h4>时间 Time of day</h4>
+    <input id="timeSlider" type="range" min="0" max="23.99" step="0.01" value="18.6">
+    <div class="chips" id="timePresets"></div>
+    <div class="row" style="margin-top:8px">
+      <span style="font-size:10.5px;color:var(--dim)">昼夜流速</span>
+      <select id="flow">
+        <option value="0">静止</option>
+        <option value="0.05">缓慢</option>
+        <option value="0.2">正常</option>
+        <option value="0.8">快速</option>
+        <option value="3">飞速</option>
+      </select>
+    </div>
+  </div>
+  <div class="sec">
+    <h4>天气 Weather</h4>
+    <div class="chips" id="weathers"></div>
+  </div>
+  <div class="sec">
+    <h4>画面 Visuals</h4>
+    <div class="chips" id="toggles"></div>
+    <div class="row" style="margin-top:9px">
+      <span style="font-size:10.5px;color:var(--dim);white-space:nowrap">画质</span>
+      <select id="qual">
+        <option value="ultra">极致 Ultra</option>
+        <option value="high" selected>高 High</option>
+        <option value="medium">中 Medium</option>
+        <option value="low">低 Low</option>
+      </select>
+    </div>
+    <div class="row" style="margin-top:9px">
+      <span style="font-size:10.5px;color:var(--dim);white-space:nowrap">辉光</span>
+      <input id="bloom" type="range" min="0" max="2" step="0.05" value="1">
+    </div>
+    <div class="row" style="margin-top:9px">
+      <span style="font-size:10.5px;color:var(--dim);white-space:nowrap">灵敏度</span>
+      <input id="sens" type="range" min="0.25" max="2.5" step="0.05" value="1">
+    </div>
+  </div>
+  <div class="sec">
+    <h4>地标传送 Landmarks</h4>
+    <input id="search" placeholder="搜索地标 / Search…">
+    <div id="lmList"></div>
+  </div>
+  <div class="sec">
+    <h4>知多一点</h4>
+    <div id="tip"></div>
+  </div>
+</div>
+
+<div id="right" class="ui">
+  <div class="card">
+    <div class="minihead"><span>维港平面图 · 点击传送</span><span id="coord"></span></div>
+    <canvas id="mini" width="240" height="150"></canvas>
+  </div>
+  <div class="card" id="info"></div>
+</div>
+
+<div id="bottom" class="ui"><div id="hint"></div></div>
+
+<div id="loading">
+  <h1>维多利亚<b>港</b></h1>
+  <div class="sub">Voxel Digital Twin · Hong Kong</div>
+  <svg class="skyline" viewBox="0 0 560 74" preserveAspectRatio="none">
+    <g fill="#1d3348">
+      <rect x="6" y="46" width="14" height="28"/><rect x="24" y="38" width="10" height="36"/>
+      <rect x="38" y="52" width="16" height="22"/><rect x="58" y="20" width="12" height="54"/>
+      <rect x="74" y="30" width="9" height="44"/><rect x="88" y="44" width="18" height="30"/>
+      <rect x="110" y="12" width="13" height="62"/><rect x="127" y="34" width="10" height="40"/>
+      <rect x="141" y="48" width="20" height="26"/><rect x="165" y="26" width="11" height="48"/>
+      <rect x="180" y="40" width="14" height="34"/><rect x="198" y="8" width="12" height="66"/>
+      <rect x="214" y="36" width="9" height="38"/><rect x="227" y="50" width="17" height="24"/>
+      <rect x="248" y="28" width="12" height="46"/><rect x="264" y="42" width="15" height="32"/>
+      <rect x="283" y="18" width="11" height="56"/><rect x="298" y="38" width="13" height="36"/>
+      <rect x="315" y="50" width="19" height="24"/><rect x="338" y="24" width="12" height="50"/>
+      <rect x="354" y="40" width="10" height="34"/><rect x="368" y="46" width="16" height="28"/>
+      <rect x="388" y="14" width="12" height="60"/><rect x="404" y="34" width="11" height="40"/>
+      <rect x="419" y="48" width="18" height="26"/><rect x="441" y="30" width="12" height="44"/>
+      <rect x="457" y="44" width="14" height="30"/><rect x="475" y="22" width="11" height="52"/>
+      <rect x="490" y="40" width="15" height="34"/><rect x="509" y="50" width="18" height="24"/>
+      <rect x="531" y="34" width="12" height="40"/>
+    </g>
+  </svg>
+  <div class="lbar"><i></i></div>
+  <div class="lmsg">正在唤醒维港…</div>
+  <div class="lpct">0%</div>
+</div>
+
+<script>
+  // 控制台捕获：着色器编译失败等只走 console.warn/error，无头探针看不到，
+  // 因此在这里截流一份，probe 模式会把它写进 id 为 probelog 的节点。
+  (function () {
+    var logs = window.__LOG = [];
+    ['error', 'warn'].forEach(function (k) {
+      var o = console[k].bind(console);
+      console[k] = function () {
+        try {
+          logs.push(k.toUpperCase() + ' ' + Array.prototype.map.call(arguments, function (a) {
+            return (a && a.message) ? a.message : String(a);
+          }).join(' ').slice(0, 6000));
+        } catch (e) { }
+        o.apply(console, arguments);
+      };
+    });
+  })();
+</script>
+<script src="vendor/three.min.js"></script>
+<script src="src/core.js"></script>
+<script src="src/volume.js"></script>
+<script src="src/geo.js"></script>
+<script src="src/build.js"></script>
+<script src="src/archetypes.js"></script>
+<script src="src/landmarks.js"></script>
+<script src="src/extra.js"></script>
+<script src="src/city.js"></script>
+<script src="src/detail.js"></script>
+<script src="src/gfx.js"></script>
+<script src="src/entities.js"></script>
+<script src="src/ui.js"></script>
+<script src="src/app.js"></script>
+<script>
+  (function(){
+    function boot(){
+      if(!window.THREE){ document.querySelector('#loading .lmsg').textContent='three.js 未加载：请确认 vendor/three.min.js 存在'; return; }
+      HKV.App.start().catch(function(e){
+        console.error(e);
+        document.querySelector('#loading .lmsg').textContent = '构建失败：' + e.message;
+        var pre=document.createElement('pre'); pre.id='probe';
+        pre.textContent='PROBE ERROR ' + e.message + '\n' + (e.stack||'');
+        document.body.appendChild(pre); document.title='PROBE ERROR';
+      });
+    }
+    if(document.readyState==='complete') boot(); else addEventListener('load', boot);
+    // 第一人称时显示准星
+    setInterval(function(){
+      if(!window.HKV||!HKV.App||!HKV.App.S) return;
+      document.body.classList.toggle('fp', HKV.App.S.mode==='fp'||HKV.App.S.mode==='drone');
+    },200);
+  })();
+</script>
+</body>
+</html>
