@@ -1,0 +1,50 @@
+:root {
+  /* Paper, ink, accent */
+  --paper: #F4F1EA;
+  --paper-deep: #ECE7DC;
+  --paper-shadow: rgba(26, 26, 26, 0.07);
+  --ink: #1A1A1A;
+  --ink-soft: #2C2C2C;
+  --ink-mute: #6B6760;
+  --ink-faint: #A39E94;
+  --ghost: rgba(26, 26, 26, 0.32);
+  --ghost-faint: rgba(26, 26, 26, 0.14);
+  --accent: #7A1F1F;
+  --accent-soft: rgba(122, 31, 31, 0.08);
+
+  /* Type scale (editorial, gentle) */
+  --fs-display: clamp(2.6rem, 6.4vw, 5.6rem);
+  --fs-h1: clamp(2rem, 4.2vw, 3.4rem);
+  --fs-h2: clamp(1.4rem, 2.2vw, 1.9rem);
+  --fs-body: clamp(1.05rem, 1.35vw, 1.25rem);
+  --fs-small: clamp(0.78rem, 0.9vw, 0.88rem);
+  --fs-mark: 0.72rem;
+
+  /* Spacing */
+  --gap-xs: 0.4rem;
+  --gap-sm: 0.8rem;
+  --gap-md: 1.6rem;
+  --gap-lg: 3.2rem;
+  --gap-xl: 6.4rem;
+  --gap-2xl: 9.6rem;
+
+  /* Easing — paper and ink, never spring */
+  --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0.2);
+  --ease-pen: cubic-bezier(0.32, 0.04, 0.18, 0.96);
+
+  /* Time */
+  --t-quick: 220ms;
+  --t-base: 640ms;
+  --t-slow: 1100ms;
+  --t-slower: 1800ms;
+
+  /* Layout */
+  --col-max: 1180px;
+  --gutter: clamp(1.2rem, 4vw, 3.4rem);
+  --rule: 1px solid rgba(26, 26, 26, 0.18);
+}
+
+@media (prefers-color-scheme: dark) {
+  /* Intentionally NOT used. This piece is paper-only. */
+}

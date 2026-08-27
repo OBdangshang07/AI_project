@@ -1,0 +1,375 @@
+.apparatus {
+  position: relative;
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: clamp(1.2rem, 4vw, 3rem);
+  min-height: 100vh;
+  padding: clamp(5rem, 8vh, 7rem) var(--gutter) clamp(3rem, 6vh, 5rem);
+  max-width: var(--col-max);
+  margin: 0 auto;
+  z-index: 2;
+  overflow: hidden;
+}
+
+.apparatus__rail {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8rem;
+  padding-top: 1rem;
+  color: var(--ink-mute);
+  border-right: 1px solid rgba(26, 26, 26, 0.12);
+  padding-right: 1rem;
+}
+
+.apparatus__rail .rail__dash {
+  width: 1px;
+  flex: 1;
+  background: linear-gradient(to bottom, rgba(26,26,26,0.16) 0%, rgba(26,26,26,0.06) 80%, transparent 100%);
+}
+
+.apparatus__main {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(2rem, 4vh, 3.6rem);
+  max-width: 720px;
+  width: 100%;
+}
+
+.apparatus__head {
+  display: flex;
+  flex-direction: column;
+  gap: 1.6rem;
+  padding-bottom: 1.2rem;
+}
+
+.apparatus__eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  color: var(--ink-mute);
+}
+
+.apparatus__eyebrow-rule {
+  flex: 1;
+  height: 1px;
+  background: rgba(26,26,26,0.16);
+}
+
+.apparatus__title {
+  font-family: 'EB Garamond', serif;
+  font-weight: 500;
+  font-size: var(--fs-display);
+  line-height: 1.04;
+  letter-spacing: -0.018em;
+  margin: 0;
+  color: var(--ink);
+  display: flex;
+  align-items: baseline;
+  gap: 0.6em;
+  font-feature-settings: 'kern', 'liga', 'onum';
+}
+
+.apparatus__title-num {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--accent);
+  font-size: 0.62em;
+  letter-spacing: 0;
+  position: relative;
+  top: -0.06em;
+}
+
+.apparatus__title-text {
+  font-style: italic;
+  font-weight: 400;
+}
+
+.apparatus__lede {
+  font-size: var(--fs-body);
+  line-height: 1.55;
+  color: var(--ink-soft);
+  margin: 0;
+  max-width: 58ch;
+}
+
+.apparatus__lede em {
+  font-style: italic;
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.apparatus__instr {
+  margin: 0;
+}
+
+.apparatus__instr-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.5rem 0;
+  border-bottom: 1px solid rgba(26,26,26,0.18);
+  color: var(--ink);
+  font-size: var(--fs-body);
+  letter-spacing: 0.005em;
+  transition: color 240ms var(--ease-out), border-color 240ms var(--ease-out);
+  cursor: pointer;
+}
+
+.apparatus__instr-btn:hover,
+.apparatus__instr-btn:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.apparatus__instr-arrow {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.85em;
+  transform: translateY(0);
+  transition: transform 280ms var(--ease-out);
+}
+
+.apparatus__instr-btn:hover .apparatus__instr-arrow,
+.apparatus__instr-btn:focus-visible .apparatus__instr-arrow {
+  transform: translateX(4px);
+}
+
+.apparatus__body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1.6rem, 3vh, 2.4rem);
+}
+
+.apparatus__manuscript {
+  font-family: 'EB Garamond', serif;
+  font-weight: 400;
+  font-style: normal;
+  font-size: clamp(1.4rem, 2.2vw, 1.95rem);
+  line-height: 1.52;
+  letter-spacing: -0.005em;
+  color: var(--ink);
+  max-width: 40ch;
+  padding: 0.6rem 0;
+}
+
+.apparatus__line {
+  margin: 0 0 0.6em 0;
+}
+
+.apparatus__line:nth-child(2) {
+  padding-left: 1em;
+}
+
+.apparatus__line:nth-child(3) {
+  padding-left: 0.5em;
+}
+
+.apparatus__meter {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(26,26,26,0.08);
+}
+
+.apparatus__meter-track {
+  position: relative;
+  flex: 1;
+  height: 2px;
+  background: rgba(26,26,26,0.08);
+  overflow: hidden;
+}
+
+.apparatus__meter-fill {
+  position: absolute;
+  inset: 0;
+  background: var(--accent);
+  transform-origin: left center;
+  will-change: transform;
+}
+
+.apparatus__meter-label {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--fs-mark);
+  color: var(--ink-mute);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.15em;
+  letter-spacing: 0.06em;
+}
+
+.apparatus__meter-sep {
+  opacity: 0.5;
+}
+
+.apparatus__meter-unit {
+  letter-spacing: 0.16em;
+  margin-left: 0.4em;
+  text-transform: lowercase;
+}
+
+.apparatus__remainder {
+  margin-top: 1.2rem;
+  padding: 1.6rem 0 1.2rem;
+  border-top: 1px solid rgba(26,26,26,0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.apparatus__remainder-mark {
+  display: inline-block;
+}
+
+.apparatus__remainder-text {
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(1.4rem, 2.2vw, 1.9rem);
+  line-height: 1.4;
+  color: var(--ink);
+  margin: 0;
+  max-width: 28ch;
+  letter-spacing: -0.005em;
+}
+
+.apparatus__remainder-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.4rem;
+  margin-top: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.apparatus__continue {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 1rem 0.55rem 1rem;
+  border: 1px solid var(--ink);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--fs-mark);
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 280ms var(--ease-out), color 280ms var(--ease-out);
+}
+
+.apparatus__continue:hover,
+.apparatus__continue:focus-visible {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.apparatus__reset {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--fs-mark);
+  letter-spacing: 0.08em;
+  color: var(--ink-mute);
+  border-bottom: 1px solid transparent;
+  transition: color 240ms var(--ease-out), border-color 240ms var(--ease-out);
+  cursor: pointer;
+  padding-bottom: 2px;
+}
+
+.apparatus__reset:hover,
+.apparatus__reset:focus-visible {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.apparatus__hint {
+  position: fixed;
+  bottom: clamp(1.2rem, 4vh, 2.6rem);
+  right: clamp(1.2rem, 4vw, 3rem);
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.45rem 0.7rem;
+  background: rgba(244, 241, 234, 0.88);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(26,26,26,0.12);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--fs-mark);
+  color: var(--ink-mute);
+  letter-spacing: 0.06em;
+  pointer-events: none;
+}
+
+.apparatus__hint-pen {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 50%;
+  font-size: 11px;
+  animation: hintPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes hintPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.08); opacity: 0.7; }
+}
+
+@keyframes apparatus-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Words compose the page on load (entrance). The headless browser's
+   virtual-time clock doesn't tick CSS animations reliably, so the actual
+   deliverable uses a CSS variable animation that's bound to the document
+   load. As a safety: if for any reason the animation hasn't reached its
+   terminal state, the words stay visible. */
+.apparatus__manuscript .word-slot {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .apparatus__hint-pen,
+  .apparatus__head,
+  .apparatus__body,
+  .apparatus__manuscript .word-slot {
+    animation: none;
+  }
+  .apparatus__manuscript .word-slot {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .apparatus {
+    grid-template-columns: 1fr;
+    padding-top: clamp(4rem, 10vh, 6rem);
+  }
+  .apparatus__rail {
+    flex-direction: row;
+    border-right: 0;
+    border-bottom: 1px solid rgba(26,26,26,0.12);
+    padding: 0 0 0.8rem 0;
+    align-items: center;
+    gap: 1rem;
+  }
+  .apparatus__rail .rail__dash {
+    width: auto;
+    height: 1px;
+    flex: 1;
+    background: linear-gradient(to right, rgba(26,26,26,0.16) 0%, rgba(26,26,26,0.06) 80%, transparent 100%);
+  }
+  .apparatus__manuscript {
+    font-size: clamp(1.4rem, 5.6vw, 1.9rem);
+    max-width: 100%;
+  }
+  .apparatus__hint {
+    right: 50%;
+    transform: translateX(50%);
+    bottom: 1rem;
+  }
+}

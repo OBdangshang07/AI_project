@@ -1,0 +1,18 @@
+00-hero: [{"id":"act-warp","top":371,"bottom":796,"overflow":-8}]
+01: [{"id":"act-warp","top":-293,"bottom":132,"overflow":-672},{"id":"act-thread","top":371,"bottom":998,"overflow":194}]
+02-thread: [{"id":"act-thread","top":-134,"bottom":492,"overflow":-312},{"id":"act-pick","top":492,"bottom":1174,"overflow":370}]
+03-pick: [{"id":"act-pick","top":371,"bottom":1053,"overflow":249}]
+04: [{"id":"act-pick","top":-194,"bottom":488,"overflow":-316},{"id":"act-unweave","top":488,"bottom":829,"overflow":25}]
+05-flaw: [{"id":"act-unweave","top":371,"bottom":712,"overflow":-92}]
+06-stop: [{"id":"act-unweave","top":371,"bottom":712,"overflow":-92}]
+07-unweave: [{"id":"act-unweave","top":24,"bottom":364,"overflow":-440},{"id":"act-reverse","top":371,"bottom":797,"overflow":-7}]
+08-relearn: [{"id":"act-reverse","top":371,"bottom":797,"overflow":-7}]
+09-reverse: [{"id":"act-reverse","top":-53,"bottom":373,"overflow":-431},{"id":"act-cutoff","top":373,"bottom":982,"overflow":178}]
+10: [{"id":"act-cutoff","top":371,"bottom":980,"overflow":176}]
+11-cut: [{"id":"act-cutoff","top":110,"bottom":719,"overflow":-85}]
+12-empty: [{"id":"act-cutoff","top":-494,"bottom":115,"overflow":-689}]
+13-colophon: []
+TAB: BUTTON.chip|开声音 → BUTTON.chip|连续运转 → BUTTON.discovery|你把布翻过来了。背面是我实际 → BUTTON.read|STRT直穿按顺序读，一次一 → BUTTON.read|PONT人字读到尽头就折回来 → BUTTON.read|ROSE玫瑰径有偏爱的读法。 → BUTTON.read|BRKN破斜故意跳格。用来打 → BUTTON.tcell| → BUTTON.treadling__preset|斜
+
+ERRORS:
+none

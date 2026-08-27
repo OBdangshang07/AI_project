@@ -1,0 +1,423 @@
+/* ------------------------------------------------------------------
+   我是棱镜 —— 白昼光学 · 编辑版式
+   纸面 + 墨色 + 一套印刷色光谱；排版让位于装置，装置在留白里运转。
+------------------------------------------------------------------- */
+
+:root {
+  --paper: #f6f1e7;
+  --paper-deep: #efe8d9;
+  --ink: #1c1812;
+  --ink-soft: rgba(28, 24, 18, 0.62);
+  --ink-faint: rgba(28, 24, 18, 0.34);
+  --hairline: rgba(28, 24, 18, 0.18);
+  --serif: "Songti SC", "STSong", "Noto Serif SC", "Source Han Serif SC", "SimSun", serif;
+  --latin: Georgia, "Times New Roman", serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.9;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* 纸面颗粒：极轻的两层径向渐变，不用图片 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background:
+    radial-gradient(120% 90% at 20% 0%, rgba(255, 252, 244, 0.5), transparent 60%),
+    radial-gradient(140% 120% at 85% 100%, rgba(226, 214, 190, 0.35), transparent 55%);
+}
+
+::selection {
+  background: rgba(63, 115, 150, 0.25);
+}
+
+/* ---------------------------------------------------------------- 装置 */
+
+.bench {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: block;
+}
+
+main {
+  position: relative;
+  z-index: 2;
+}
+
+/* ---------------------------------------------------------------- 通用 */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip-link {
+  position: fixed;
+  top: -100%;
+  left: 1rem;
+  z-index: 20;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 0.5rem 1rem;
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.skip-link:focus-visible {
+  top: 1rem;
+}
+
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid #3f7396;
+  outline-offset: 3px;
+}
+
+/* ---------------------------------------------------------------- 首屏 */
+
+.hero {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: clamp(1.5rem, 4vw, 4rem);
+  position: relative;
+}
+
+.hero-inner {
+  max-width: 30em;
+}
+
+.eyebrow {
+  font-size: 0.8rem;
+  letter-spacing: 0.35em;
+  color: var(--ink-soft);
+  margin: 0 0 1.2rem;
+}
+
+.hero-title {
+  font-size: clamp(3.2rem, 9vw, 6.5rem);
+  line-height: 1.08;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  margin: 0 0 1.4rem;
+  white-space: nowrap;
+}
+
+.lede {
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+  line-height: 2;
+  color: var(--ink);
+  max-width: 22em;
+  margin: 0;
+}
+
+.hints {
+  list-style: none;
+  margin: 2.6rem 0 0;
+  padding: 1.1rem 0 0;
+  border-top: 1px solid var(--hairline);
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  display: grid;
+  gap: 0.35rem;
+}
+
+.hints li::before {
+  content: "—";
+  margin-right: 0.6em;
+  color: var(--ink-faint);
+}
+
+.scroll-cue {
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.7rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.3em;
+  color: var(--ink-faint);
+  margin: 0;
+}
+
+.scroll-cue span {
+  width: 1px;
+  height: 3.2rem;
+  background: linear-gradient(var(--ink-faint), transparent);
+  animation: cue 2.6s ease-in-out infinite;
+}
+
+@keyframes cue {
+  0%, 100% { transform: scaleY(0.35); transform-origin: top; opacity: 0.4; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
+/* ---------------------------------------------------------------- 章节 */
+
+/*
+ * 版式决定：所有文字版固定在左列，光学装置独占中右视野——
+ * 像一本左页注释、右页仪器的光学图谱。节奏靠每章不同的吸附高度制造。
+ */
+.chapter {
+  min-height: 175vh;
+  display: flex;
+  align-items: flex-start;
+  padding: 0 clamp(1.5rem, 6vw, 6rem);
+}
+
+.chapter:nth-of-type(2) .plate { top: 14vh; }
+.chapter:nth-of-type(3) .plate { top: 24vh; }
+.chapter:nth-of-type(4) .plate { top: 16vh; }
+.chapter:nth-of-type(5) .plate { top: 26vh; }
+
+.plate {
+  position: sticky;
+  top: 16vh;
+  max-width: 30em;
+  background: var(--paper);
+  padding: clamp(1.6rem, 3vw, 2.6rem);
+  border-top: 3px solid var(--hue, var(--ink));
+  box-shadow: 0 0 0 1px var(--hairline);
+}
+
+.plate-head {
+  display: flex;
+  align-items: baseline;
+  gap: 1.2rem;
+}
+
+.plate-no {
+  font-size: 2.6rem;
+  line-height: 1;
+  color: var(--hue, var(--ink));
+  font-weight: 700;
+}
+
+.plate h2 {
+  font-size: clamp(1.9rem, 4vw, 2.7rem);
+  margin: 0;
+  letter-spacing: 0.12em;
+  line-height: 1.2;
+}
+
+.plate-term {
+  font-family: var(--latin);
+  font-style: italic;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+  margin: 0.3rem 0 0;
+  letter-spacing: 0.08em;
+}
+
+/* 谱带分隔线：章节色收束为整段光谱，呼应装置 */
+.spectral-rule {
+  display: block;
+  height: 2px;
+  margin: 1.4rem 0 1.6rem;
+  background: linear-gradient(
+    90deg,
+    var(--hue, var(--ink)) 0%,
+    #c13b22 25%,
+    #d98e2b 45%,
+    #7c8f3f 62%,
+    #3f7396 80%,
+    #6b568c 100%
+  );
+  opacity: 0.85;
+}
+
+.plate p {
+  margin: 0 0 1.1rem;
+}
+
+.plate p:last-child {
+  margin-bottom: 0;
+}
+
+/* ---------------------------------------------------------------- 尾注 */
+
+.coda {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12vh clamp(1.5rem, 6vw, 6rem) 16vh;
+}
+
+.coda-plate {
+  position: relative;
+  top: 0;
+}
+
+.coda-line {
+  font-size: 0.92rem;
+  color: var(--ink-soft);
+}
+
+.sign {
+  margin-top: 2.2rem !important;
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--hairline);
+  font-size: 1.1rem;
+  letter-spacing: 0.06em;
+}
+
+/* ---------------------------------------------------------------- 标尺 */
+
+.rail {
+  position: fixed;
+  right: clamp(0.6rem, 1.6vw, 1.4rem);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 4px;
+}
+
+.rail-seg {
+  width: 3px;
+  height: 2.6rem;
+  opacity: 0.28;
+  transition: opacity 0.5s ease, width 0.5s ease;
+}
+
+.rail-seg[data-active="true"] {
+  opacity: 0.95;
+  width: 5px;
+}
+
+.rail-marker {
+  position: absolute;
+  left: -7px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1.5px solid var(--ink);
+  background: var(--paper);
+  transform: translateY(-50%);
+  transition: top 0.2s linear;
+}
+
+/* ---------------------------------------------------------------- 状态条 */
+
+.trap-status {
+  position: fixed;
+  left: 50%;
+  bottom: 2rem;
+  transform: translate(-50%, 1.5rem);
+  z-index: 10;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 0.85rem;
+  letter-spacing: 0.08em;
+  padding: 0.6rem 1.3rem;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s ease, transform 0.45s ease;
+}
+
+.trap-status[data-show="true"] {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.trap-status[data-trapped="false"] {
+  background: #3f7396;
+}
+
+/* ---------------------------------------------------------------- 移动端 */
+
+@media (max-width: 720px) {
+  body {
+    font-size: 16px;
+  }
+
+  .hero {
+    justify-content: space-between;
+  }
+
+  .hero-inner {
+    max-width: 100%;
+  }
+
+  /* 移动端：操作提示沉底，把画面中段让给装置 */
+  .hints {
+    margin-top: 0;
+  }
+
+  .scroll-cue {
+    display: none;
+  }
+
+  .chapter {
+    min-height: 165vh;
+    padding: 0 1.2rem 8vh;
+    align-items: flex-end;
+  }
+
+  .plate {
+    position: relative;
+    top: 0 !important;
+    max-width: 100%;
+  }
+
+  .rail {
+    right: 0.4rem;
+  }
+
+  .rail-seg {
+    height: 1.8rem;
+  }
+
+  /* 状态条让开底部的文字版，贴到顶部 */
+  .trap-status {
+    bottom: auto;
+    top: 1rem;
+  }
+}
+
+/* ----------------------------------------------------- reduced motion */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .scroll-cue span,
+  .rail-seg,
+  .rail-marker,
+  .trap-status {
+    animation: none;
+    transition: none;
+  }
+}

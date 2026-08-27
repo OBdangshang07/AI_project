@@ -1,0 +1,951 @@
+/* ============================================================
+   《下一个词》设计系统
+   纸 / 墨 / 朱砂 —— 暖纸底、墨字、一点朱砂。
+   排版即内容：宋体大标题、等宽元信息、两端对齐正文、大留白。
+   ============================================================ */
+
+:root {
+  --paper: #f5f1e8;
+  --paper-2: #ece6d8;
+  --ink: #1c1914;
+  --ink-70: #4c463c;
+  --ink-55: #66604f;
+  --ink-30: #b6ae9c;
+  --rule: rgba(28, 25, 20, 0.14);
+  --rule-strong: rgba(28, 25, 20, 0.32);
+  --cinnabar: #c13b2a;
+  --cinnabar-deep: #8f2a1d;
+  --serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', 'SimSun', serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 17px;
+  line-height: 1.95;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+::selection {
+  background: var(--cinnabar);
+  color: var(--paper);
+}
+
+:focus-visible {
+  outline: 2px solid var(--cinnabar);
+  outline-offset: 3px;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+/* ---------------------------------------------------------- 工具类 */
+
+.mono {
+  font-family: var(--mono);
+  font-weight: 400;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skip {
+  position: fixed;
+  top: -60px;
+  left: 16px;
+  z-index: 100;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 0.7em 1.2em;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  text-decoration: none;
+  transition: top 0.2s ease;
+}
+
+.skip:focus-visible {
+  top: 14px;
+}
+
+/* ---------------------------------------------------------- 画布与颗粒 */
+
+.field {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 180px 180px;
+}
+
+.font-preload {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+/* ---------------------------------------------------------- HUD 与侧栏 */
+
+.hud {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: space-between;
+  padding: 20px clamp(20px, 4vw, 42px);
+  pointer-events: none;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  color: var(--ink-55);
+}
+
+.rail {
+  position: fixed;
+  right: 28px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 15px;
+}
+
+.rail a {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-decoration: none;
+  color: var(--ink-55);
+}
+
+.rail .lbl {
+  writing-mode: vertical-rl;
+  font-size: 0.62rem;
+  letter-spacing: 0.3em;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.rail a:hover .lbl,
+.rail a:focus-visible .lbl,
+.rail a.act .lbl {
+  opacity: 1;
+  transform: translateY(0);
+  color: var(--ink);
+}
+
+.rail .tick {
+  width: 16px;
+  height: 1px;
+  background: var(--ink);
+  opacity: 0.32;
+  transition: width 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), background 0.3s, opacity 0.3s;
+}
+
+.rail a.act .tick {
+  width: 30px;
+  background: var(--cinnabar);
+  opacity: 1;
+}
+
+.rail .tau {
+  margin-top: 12px;
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  color: var(--ink-55);
+}
+
+/* ---------------------------------------------------------- 章节骨架 */
+
+main {
+  position: relative;
+  z-index: 1;
+}
+
+.sec {
+  position: relative;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: clamp(96px, 15vh, 200px) clamp(22px, 6vw, 88px);
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  color: var(--ink-55);
+  margin-bottom: clamp(26px, 4vh, 44px);
+}
+
+.meta .rule {
+  flex: 1;
+  height: 1px;
+  background: var(--rule-strong);
+  min-width: 24px;
+}
+
+.sec-title {
+  font-size: clamp(1.9rem, 4.8vw, 3.5rem);
+  font-weight: 900;
+  line-height: 1.24;
+  letter-spacing: 0.01em;
+  max-width: 15em;
+}
+
+.body {
+  margin-top: clamp(22px, 3.5vh, 40px);
+}
+
+.body p {
+  max-width: 36em;
+  margin-top: 1.15em;
+  font-size: 1.03rem;
+  line-height: 2.1;
+  text-align: justify;
+}
+
+.body p:first-child {
+  margin-top: 0;
+}
+
+/* ---------------------------------------------------------- 逐字采样出场 */
+
+.sampled .ch {
+  white-space: pre;
+}
+
+.sampled .ch.done {
+  animation: ch-settle 0.55s ease-out;
+}
+
+@keyframes ch-settle {
+  0%,
+  35% {
+    color: var(--cinnabar);
+  }
+  100% {
+    color: inherit;
+  }
+}
+
+/* ---------------------------------------------------------- 英雄区 */
+
+.hero {
+  min-height: 100vh;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(18px, 3.2vh, 32px);
+}
+
+.hero-hints {
+  position: absolute;
+  bottom: clamp(28px, 6vh, 64px);
+  left: clamp(22px, 6vw, 88px);
+}
+
+.hero-title {
+  font-size: clamp(3.6rem, 16vw, 11.5rem);
+  font-weight: 900;
+  line-height: 1.06;
+  letter-spacing: 0.04em;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin-left: -0.06em;
+}
+
+.seal-host {
+  position: relative;
+  display: inline-block;
+}
+
+.seal-host .sampled {
+  position: relative;
+  z-index: 1;
+  transition: color 0.45s ease 0.08s;
+}
+
+.seal-host.stamped .sampled {
+  color: var(--paper);
+}
+
+.seal {
+  position: absolute;
+  inset: 0.04em -0.1em 0.08em -0.1em;
+  background: var(--cinnabar);
+  border-radius: 2px;
+  opacity: 0;
+  transform: rotate(3deg) scale(1.4);
+  z-index: 0;
+}
+
+.seal.on {
+  animation: stamp 0.5s cubic-bezier(0.2, 1.4, 0.3, 1) forwards;
+}
+
+@keyframes stamp {
+  0% {
+    opacity: 0;
+    transform: rotate(3deg) scale(1.4);
+  }
+  55% {
+    opacity: 0.96;
+    transform: rotate(-2.5deg) scale(0.97);
+  }
+  100% {
+    opacity: 0.93;
+    transform: rotate(-2deg) scale(1);
+  }
+}
+
+.draw {
+  border: none;
+  height: 1px;
+  width: min(560px, 72%);
+  background: var(--ink);
+  opacity: 0.4;
+  transform: scaleX(0);
+  transform-origin: left;
+  margin: 4px 0 2px;
+}
+
+.draw.on {
+  transform: scaleX(1);
+  transition: transform 1.1s cubic-bezier(0.6, 0, 0.2, 1) 1.7s;
+}
+
+.hero-sub {
+  max-width: 29em;
+  font-size: clamp(1rem, 1.7vw, 1.22rem);
+  line-height: 2.25;
+  opacity: 0;
+}
+
+.hero-sub.on {
+  opacity: 1;
+  transition: opacity 1s ease 2.4s;
+}
+
+.hero-hints {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.24em;
+  color: var(--ink-55);
+  opacity: 0;
+  margin-top: clamp(18px, 5vh, 56px);
+}
+
+.hero-hints.on {
+  opacity: 1;
+  transition: opacity 1s ease 3s;
+}
+
+/* ---------------------------------------------------------- §01 上下文 */
+
+.ctx-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(30px, 5vw, 72px);
+  margin-top: clamp(26px, 4vh, 46px);
+}
+
+@media (min-width: 980px) {
+  .ctx-grid {
+    grid-template-columns: minmax(0, 5fr) minmax(0, 6fr);
+    align-items: start;
+  }
+}
+
+.stage {
+  border: 1px solid var(--rule);
+  padding: clamp(22px, 3vw, 40px);
+  background: rgba(245, 241, 232, 0.72);
+}
+
+.stage-label {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  color: var(--ink-55);
+  margin-bottom: 18px;
+}
+
+#ctx-in {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: clamp(1.25rem, 3vw, 1.8rem);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--rule-strong);
+  border-radius: 0;
+  padding: 0.3em 0 0.45em;
+  width: 100%;
+  max-width: 560px;
+  color: var(--ink);
+  caret-color: var(--cinnabar);
+}
+
+#ctx-in::placeholder {
+  color: var(--ink-30);
+  font-weight: 400;
+}
+
+#ctx-in:focus-visible {
+  outline: none;
+  border-bottom-color: var(--cinnabar);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
+}
+
+.chip {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  padding: 0.62em 1.1em;
+  border: 1px solid var(--rule-strong);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.chip:hover,
+.chip:focus-visible {
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+
+.readout {
+  margin-top: 30px;
+  min-height: 64px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px 22px;
+}
+
+.ro-title {
+  font-size: 0.66rem;
+  letter-spacing: 0.18em;
+  color: var(--ink-55);
+  align-self: center;
+}
+
+.tok {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 64px;
+}
+
+.tok b {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.tok i {
+  display: block;
+  height: 3px;
+  background: var(--ink);
+  transition: width 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.tok .w {
+  font-size: 0.58rem;
+  letter-spacing: 0.08em;
+  color: var(--ink-55);
+}
+
+.ro-empty {
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  color: var(--ink-30);
+  align-self: center;
+}
+
+.fb {
+  margin-top: 26px;
+  font-size: 0.98rem;
+  line-height: 2;
+  color: var(--ink-70);
+  border-left: 2px solid var(--cinnabar);
+  padding-left: 14px;
+  min-height: 2em;
+}
+
+/* ---------------------------------------------------------- §02 温度 */
+
+.mode {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.26em;
+  color: var(--cinnabar);
+  margin-top: 16px;
+}
+
+.t-body {
+  margin-top: clamp(40px, 6.5vh, 72px);
+}
+
+.t-body p {
+  max-width: 36em;
+  margin-top: 1.1em;
+  font-size: 1.03rem;
+  line-height: 2.1;
+  text-align: justify;
+}
+
+.slider-row {
+  margin-top: clamp(26px, 4vh, 44px);
+  max-width: 620px;
+}
+
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 30px;
+  background: transparent;
+  cursor: pointer;
+}
+
+input[type='range']::-webkit-slider-runnable-track {
+  height: 2px;
+  background: var(--ink-30);
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: -9px;
+  background: var(--cinnabar);
+  border: 3px solid var(--paper);
+  box-shadow: 0 0 0 1px var(--cinnabar-deep);
+  border-radius: 3px;
+}
+
+input[type='range']::-moz-range-track {
+  height: 2px;
+  background: var(--ink-30);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: var(--cinnabar);
+  border: 3px solid var(--paper);
+  box-shadow: 0 0 0 1px var(--cinnabar-deep);
+  border-radius: 3px;
+}
+
+.ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  color: var(--ink-55);
+  margin-top: 8px;
+}
+
+.tval {
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  color: var(--ink-70);
+  margin-top: 20px;
+}
+
+.cap {
+  font-size: 0.66rem;
+  letter-spacing: 0.2em;
+  color: var(--ink-55);
+  margin-top: 34px;
+}
+
+/* ---------------------------------------------------------- §03 坍缩 */
+
+.stage-space {
+  height: clamp(240px, 42vh, 46vh);
+}
+
+.hold-row {
+  display: flex;
+  align-items: center;
+  gap: 26px;
+  flex-wrap: wrap;
+}
+
+.hold {
+  font-family: var(--serif);
+  font-weight: 600;
+  font-size: 1.02rem;
+  letter-spacing: 0.34em;
+  padding: 1.1em 2.2em 1.1em 2.54em;
+  border: 1px solid var(--ink);
+  border-radius: 2px;
+  background: transparent;
+  cursor: pointer;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  transition: background 0.16s ease, color 0.16s ease, transform 0.1s ease;
+}
+
+.hold:hover,
+.hold:focus-visible {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.hold.holding {
+  background: var(--ink);
+  color: var(--paper);
+  transform: scale(0.97);
+}
+
+.hold:not(.used)::after {
+  content: '';
+  display: block;
+  height: 2px;
+  margin-top: 10px;
+  background: var(--cinnabar);
+  animation: breathe 2.4s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scaleX(0.25);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+.count {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  color: var(--ink-55);
+}
+
+.ledger {
+  list-style: none;
+  margin-top: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.ledger li {
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+  color: var(--ink-70);
+}
+
+.footnote {
+  margin-top: clamp(48px, 8vh, 96px);
+  max-width: 36em;
+  font-size: 0.88rem;
+  line-height: 2.1;
+  color: var(--ink-55);
+  border-top: 1px solid var(--rule);
+  padding-top: 18px;
+}
+
+/* ---------------------------------------------------------- §04 落款 */
+
+.sign-row {
+  display: flex;
+  align-items: center;
+  gap: clamp(26px, 4vw, 48px);
+  margin-top: clamp(40px, 7vh, 80px);
+  flex-wrap: wrap;
+}
+
+@media (min-width: 900px) {
+  /* 落款页的签名偏右，像一封信的末端 */
+  .sign-row {
+    margin-left: auto;
+    margin-right: clamp(0px, 9vw, 140px);
+  }
+}
+
+.big-seal {
+  position: relative;
+  width: clamp(76px, 9vw, 96px);
+  aspect-ratio: 1;
+  background: var(--cinnabar);
+  color: var(--paper);
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  place-items: center;
+  font-size: clamp(1.7rem, 2.4vw, 2.1rem);
+  font-weight: 900;
+  line-height: 1;
+  border-radius: 3px;
+  opacity: 0;
+  transform: rotate(3deg) scale(1.5);
+}
+
+.big-seal.on {
+  animation: stamp 0.55s cubic-bezier(0.2, 1.3, 0.3, 1) forwards;
+}
+
+.big-seal::after {
+  content: '';
+  position: absolute;
+  inset: -22%;
+  background: radial-gradient(circle, rgba(193, 59, 42, 0.3), transparent 68%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.big-seal.on::after {
+  animation: splash 0.9s ease-out 0.18s;
+}
+
+@keyframes splash {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.3);
+  }
+}
+
+.sign-text p {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  color: var(--ink-55);
+  line-height: 2.4;
+}
+
+.colophon {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 30px;
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.16em;
+  color: var(--ink-55);
+  margin-top: clamp(60px, 10vh, 120px);
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+}
+
+.colophon a {
+  text-decoration: none;
+  border-bottom: 1px solid var(--cinnabar);
+  padding-bottom: 1px;
+  transition: color 0.15s ease;
+}
+
+.colophon a:hover {
+  color: var(--cinnabar);
+}
+
+/* ---------------------------------------------------------- 静止提示 */
+
+.still-cap {
+  position: fixed;
+  left: 34px;
+  bottom: 30px;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.95rem;
+  letter-spacing: 0.14em;
+  pointer-events: none;
+}
+
+.still-cap::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  background: var(--cinnabar);
+  flex: none;
+}
+
+/* ---------------------------------------------------------- 响应式 */
+
+@media (max-width: 760px) {
+  body {
+    font-size: 16px;
+  }
+
+  .hud-r {
+    display: none;
+  }
+
+  .rail {
+    top: auto;
+    bottom: 12px;
+    left: 16px;
+    right: 16px;
+    transform: none;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    gap: 4px;
+    background: rgba(245, 241, 232, 0.85);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 10px 14px;
+  }
+
+  .rail .lbl {
+    display: none;
+  }
+
+  .rail .tick {
+    width: 14px;
+  }
+
+  .rail a.act .tick {
+    width: 24px;
+  }
+
+  .rail .tau {
+    margin-top: 0;
+  }
+
+  .still-cap {
+    left: 20px;
+    bottom: 66px;
+    font-size: 0.85rem;
+  }
+
+  .hero-title {
+    font-size: clamp(3.2rem, 19vw, 5rem);
+  }
+
+  .hero-hints {
+    position: static;
+    margin-top: clamp(18px, 5vh, 56px);
+  }
+
+  .stage-space {
+    height: 38vh;
+  }
+
+  .hold {
+    letter-spacing: 0.26em;
+    padding: 1em 1.7em 1em 1.96em;
+  }
+}
+
+/* ---------------------------------------------------------- 减少动态 */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .draw.on {
+    transition: none;
+    transform: scaleX(1);
+  }
+
+  .hero-sub.on,
+  .hero-hints.on {
+    transition: none;
+    opacity: 1;
+  }
+
+  .seal.on,
+  .big-seal.on {
+    animation: none;
+    opacity: 0.93;
+    transform: rotate(-2deg) scale(1);
+  }
+
+  .big-seal.on {
+    opacity: 1;
+  }
+
+  .hold:not(.used)::after {
+    animation: none;
+    transform: scaleX(1);
+    opacity: 0.8;
+  }
+
+  .sampled .ch.done {
+    animation: none;
+  }
+
+  .tok i {
+    transition: none;
+  }
+}

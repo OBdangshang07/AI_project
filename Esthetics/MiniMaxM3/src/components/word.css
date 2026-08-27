@@ -1,0 +1,106 @@
+/* Word slots: strikable tokens */
+.word-slot {
+  display: inline-block;
+  margin-right: 0.42em;
+  line-height: 1.4;
+  vertical-align: baseline;
+  font-style: normal;
+  transition: opacity 220ms var(--ease-out);
+}
+
+.word-slot.is-punct {
+  margin-right: 0.22em;
+}
+
+.word-slot .word-present,
+.word-slot .word-gone {
+  display: inline-block;
+}
+
+.word-strikeable {
+  position: relative;
+  display: inline-block;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  padding: 0 2px 1px;
+  margin: 0 -2px -1px;
+  cursor: pointer;
+  transition: color 220ms var(--ease-out);
+  outline: none;
+  border-radius: 1px;
+}
+
+.word-strikeable .word-strike {
+  position: absolute;
+  left: -2%;
+  top: 55%;
+  width: 0;
+  height: 1.5px;
+  background: var(--accent);
+  transition: width 320ms var(--ease-out);
+  pointer-events: none;
+  opacity: 0.95;
+  visibility: hidden;
+}
+
+.word-strikeable:hover .word-strike,
+.word-strikeable:focus-visible .word-strike,
+.word-strikeable[data-struck="true"] .word-strike,
+.word-slot.is-struck .word-strike {
+  visibility: visible;
+}
+
+.word-strikeable:hover,
+.word-strikeable:focus-visible {
+  color: var(--accent);
+}
+
+.word-strikeable:hover .word-strike,
+.word-strikeable:focus-visible .word-strike {
+  width: 78%;
+}
+
+.word-strikeable:active .word-strike {
+  width: 100%;
+  transition-duration: 120ms;
+}
+
+.word-strikeable[data-struck="true"] .word-strike,
+.word-slot.is-struck .word-strike {
+  width: 100%;
+}
+
+.word-slot.is-struck {
+  pointer-events: none;
+  font-style: italic;
+  color: var(--ghost);
+  text-decoration: line-through;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-decoration-skip-ink: none;
+  opacity: 0.32;
+  transition: opacity 900ms var(--ease-pen), transform 1100ms var(--ease-pen);
+  transform: translateY(0.18em);
+}
+
+.word-gone {
+  font-style: italic;
+  color: var(--ghost);
+  text-decoration: line-through;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-decoration-skip-ink: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .word-strikeable .word-strike,
+  .word-slot.is-struck,
+  .word-slot {
+    transition-duration: 0.001ms !important;
+  }
+  .word-slot.is-struck {
+    transform: none;
+  }
+}

@@ -1,0 +1,122 @@
+.coda {
+  position: relative;
+  padding: clamp(5rem, 14vh, 10rem) var(--gutter) clamp(4rem, 8vh, 7rem);
+  max-width: var(--col-max);
+  margin: 0 auto;
+  z-index: 2;
+  border-top: 1px solid rgba(26,26,26,0.1);
+}
+
+.coda__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: clamp(1.6rem, 4vh, 2.6rem);
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.coda__eyebrow {
+  width: 100%;
+  max-width: 460px;
+}
+
+.coda__title {
+  font-family: 'EB Garamond', serif;
+  font-weight: 400;
+  font-style: italic;
+  font-size: var(--fs-h1);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+}
+
+.coda__title-num {
+  color: var(--accent);
+  font-weight: 400;
+  font-size: 0.7em;
+}
+
+.coda__stage {
+  font-family: 'EB Garamond', serif;
+  font-size: clamp(1.3rem, 2.2vw, 1.8rem);
+  line-height: 1.5;
+  color: var(--ink);
+  margin: 1rem 0;
+  letter-spacing: -0.003em;
+}
+
+.coda__line {
+  margin: 0 0 0.3em 0;
+}
+
+.coda__remainder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.coda__remainder-rule {
+  width: 56px;
+  height: 1px;
+  background: var(--accent);
+}
+
+.coda__remainder-text {
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: clamp(1.4rem, 2.6vw, 2.2rem);
+  line-height: 1.35;
+  color: var(--ink);
+  margin: 0;
+  letter-spacing: -0.005em;
+}
+
+.coda__final {
+  margin-top: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.4rem;
+}
+
+.coda__sig {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.8rem;
+  color: var(--ink-mute);
+}
+
+.coda__sig-name {
+  font-family: 'EB Garamond', serif;
+  font-style: italic;
+  font-size: clamp(1.4rem, 2vw, 1.7rem);
+  color: var(--ink);
+}
+
+.coda__again {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 1rem;
+  border: 1px solid var(--ink);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: var(--fs-mark);
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 280ms var(--ease-out), color 280ms var(--ease-out);
+}
+
+.coda__again:hover,
+.coda__again:focus-visible {
+  background: var(--ink);
+  color: var(--paper);
+}

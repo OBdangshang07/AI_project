@@ -1,0 +1,651 @@
+/* ============================================================================
+   UNRESOLVED FIELD — design system
+   纸与墨，不是屏幕与光。 Paper and ink, not screen and light.
+   一个装置 · 一个强调色 · 一次高潮 · 零个卡片
+   ========================================================================== */
+
+:root {
+  /* --- ink & paper ------------------------------------------------------- */
+  --paper:    #f1eee6;
+  --paper-in: #e8e4d9;   /* recessed paper: the back of the sheet */
+  --ink:      #16130f;
+  --ink-2:    #5c564c;   /* readable secondary — 5.8:1 on paper */
+  --ink-3:    #a8a196;   /* decorative rules only, never body text */
+  --red:      #b23a2b;   /* the editor's pen, the seal, the chosen line */
+  --red-soft: rgba(178, 58, 43, 0.16);
+
+  --rule:     rgba(22, 19, 15, 0.14);
+  --rule-2:   rgba(22, 19, 15, 0.07);
+
+  /* --- type ------------------------------------------------------------- */
+  --serif: "Songti SC", "Source Han Serif SC", "Noto Serif CJK SC", STSong,
+           "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua",
+           Georgia, SimSun, serif;
+  --hand:  "Kaiti SC", STKaiti, KaiTi, "Xingkai SC", "Songti SC", Georgia, serif;
+  --mono:  ui-monospace, "SF Mono", SFMono-Regular, "Cascadia Mono",
+           "JetBrains Mono", Consolas, "Liberation Mono", monospace;
+
+  /* --- rhythm ----------------------------------------------------------- */
+  --pad: clamp(1.25rem, 5vw, 5.5rem);
+  --col: minmax(0, 1fr);
+  --ease-brush: cubic-bezier(0.16, 1, 0.3, 1);   /* fast attack, long settle */
+  --ease-snap:  cubic-bezier(0.62, 0, 0.2, 1);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+html, body { margin: 0; background: var(--paper); }
+
+body {
+  color: var(--ink);
+  font-family: var(--serif);
+  line-height: 2;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-x: hidden;
+}
+
+/* paper grain — one fixed multiply layer, rasterised once by the browser -- */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.86' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)' opacity='0.09'/%3E%3C/svg%3E");
+}
+/* the sheet edge: a warm vignette so the paper reads as a physical page --- */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    radial-gradient(130% 100% at 50% 0%, rgba(22,19,15,0) 55%, rgba(22,19,15,0.055) 100%),
+    linear-gradient(90deg, rgba(22,19,15,0.05), rgba(22,19,15,0) 12% 88%, rgba(22,19,15,0.05));
+}
+
+/* ---------------------------------------------------------------- device */
+.device {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;      /* the page listens; the canvas only draws */
+}
+.device canvas { display: block; width: 100%; height: 100%; }
+
+/* ------------------------------------------------------------------ page */
+.sheet { position: relative; z-index: 1; }
+
+.act {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100svh;
+  display: grid;
+  align-content: center;
+  gap: clamp(1.4rem, 2.4vw, 2.6rem);
+  padding: clamp(5rem, 12vh, 9rem) var(--pad);
+  grid-template-columns:
+    [full-start] var(--col) [main-start] minmax(0, 46rem) [main-end] var(--col) [full-end];
+}
+.act > * { grid-column: main; }
+
+/* ------------------------------------------------------------ choreography
+   Type arrives the way it would come off a press: a left-to-right wipe, one
+   element after another, never opacity+translateY. The clip is only applied
+   when JS is alive (html.js) so a failed bundle cannot hide the words, and it
+   is skipped entirely under reduced motion.
+   Negative insets keep glyph overhangs and descenders from being cut. */
+html.js .act > * {
+  clip-path: inset(-0.35em 100% -0.4em 0);
+  transition: clip-path 1.05s var(--ease-brush);
+}
+html.js .act[data-seen] > * { clip-path: inset(-0.35em -0.12em -0.4em 0); }
+/* the seal has its own entrance, and its ink halo has to spread past its box */
+html.js .act > .stamp, html.js .act[data-seen] > .stamp { clip-path: none; }
+html.js .act[data-seen] > *:nth-child(1) { transition-delay: 0ms; }
+html.js .act[data-seen] > *:nth-child(2) { transition-delay: 130ms; }
+html.js .act[data-seen] > *:nth-child(3) { transition-delay: 330ms; }
+html.js .act[data-seen] > *:nth-child(4) { transition-delay: 470ms; }
+html.js .act[data-seen] > *:nth-child(5) { transition-delay: 590ms; }
+html.js .act[data-seen] > *:nth-child(6) { transition-delay: 690ms; }
+html.js .act[data-seen] > *:nth-child(7) { transition-delay: 780ms; }
+html.js .act[data-seen] > *:nth-child(8) { transition-delay: 860ms; }
+
+/* the collapse, stated twice: soft in ink on the canvas, hard as a printed rule.
+   Same gesture, two materials — this is what ties the device to the page. */
+.horizon {
+  position: fixed;
+  left: 0;
+  top: 50vh;
+  width: 100%;
+  height: 1px;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--red) 14%, var(--red) 86%, transparent);
+  opacity: 0;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 1.05s var(--ease-brush), opacity 520ms linear;
+}
+html[data-collapsed] .horizon { transform: scaleX(1); opacity: 0.45; }
+
+/* act tag: 一 · 引力 ----------------------------------------------------- */
+.tag {
+  display: flex;
+  align-items: baseline;
+  gap: 0.9rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.tag::before {
+  content: "";
+  width: clamp(1.5rem, 4vw, 3.5rem);
+  height: 1px;
+  background: var(--ink);
+  transform-origin: left;
+}
+.tag b { font-weight: 400; color: var(--red); letter-spacing: 0.2em; }
+
+/* display voice ---------------------------------------------------------- */
+.display {
+  margin: 0;
+  font-weight: 400;
+  font-size: clamp(2.7rem, 10.4vw, 9rem);
+  line-height: 0.96;
+  letter-spacing: 0.012em;
+  text-wrap: balance;
+}
+.display .soft { color: var(--ink-2); }
+.display em { font-style: normal; color: var(--red); }
+/* the chapter voice: still display type, but it must never out-shout act zero */
+.display--sm {
+  font-size: clamp(1.9rem, 5.6vw, 4.1rem);
+  line-height: 1.24;
+  letter-spacing: 0.015em;
+}
+
+/* the live readout — the only number on the sheet, and it means something ---- */
+.count {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  display: flex;
+  align-items: baseline;
+  gap: 0.8ch;
+}
+.count i { font-style: normal; color: var(--ink); font-variant-numeric: tabular-nums; }
+.count b { font-weight: 400; color: var(--red); font-size: 1.1rem; }
+
+/* the seal that lands when the field collapses ---------------------------- */
+.stamp {
+  position: relative;
+  justify-self: start;
+  width: 5.2rem;
+  height: 5.2rem;
+  border: 1.5px solid var(--red);
+  color: var(--red);
+  display: grid;
+  place-items: center;
+  font-family: var(--serif);
+  font-size: 2.3rem;
+  line-height: 1;
+  opacity: 0;
+  transform: rotate(-7deg) scale(1.6);
+  transition: opacity 220ms linear, transform 700ms cubic-bezier(0.2, 1.5, 0.36, 1);
+}
+.stamp span { transform: translateY(0.06em); }
+.stamp::after {
+  content: "";
+  position: absolute;
+  inset: -0.7rem;
+  border: 1px solid var(--red-soft);
+  opacity: 0;
+}
+html[data-collapsed] .stamp { opacity: 1; transform: rotate(-7deg) scale(1); }
+html[data-collapsed] .stamp::after { animation: spread 1s var(--ease-brush) 140ms both; }
+@keyframes spread {
+  from { transform: scale(0.55); opacity: 0.9; }
+  to   { transform: scale(1.4); opacity: 0; }
+}
+
+/* the sentence the visitor writes for me --------------------------------- */
+.closing {
+  margin: 0;
+  max-width: 30ch;
+  font-size: clamp(1.15rem, 2.1vw, 1.6rem);
+  line-height: 1.85;
+}
+.closing b { font-weight: 400; color: var(--red); }
+.closing__foot {
+  display: block;
+  margin-top: 0.9rem;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  line-height: 2.2;
+}
+
+.lede {
+  margin: 0;
+  max-width: 34ch;
+  font-size: clamp(1.06rem, 1.55vw, 1.4rem);
+  line-height: 1.95;
+}
+.body {
+  margin: 0;
+  max-width: 42ch;
+  font-size: clamp(0.98rem, 1.02vw, 1.06rem);
+  line-height: 2.1;
+  color: var(--ink-2);
+}
+.body strong { font-weight: 400; color: var(--ink); }
+.body + .body { margin-top: 1.1rem; }
+
+/* marginalia: the annotation gutter -------------------------------------- */
+.marg {
+  font-family: var(--hand);
+  font-size: 0.98rem;
+  line-height: 1.9;
+  color: var(--ink-2);
+  border-left: 1px solid var(--red-soft);
+  padding-left: 1rem;
+  max-width: 26ch;
+}
+.marg u {
+  display: block;
+  text-decoration: none;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--red);
+  margin-bottom: 0.45rem;
+}
+@media (min-width: 62rem) {
+  .act--wide {
+    grid-template-columns:
+      [full-start] var(--col) [main-start] minmax(0, 40rem) [main-end] minmax(0, 18rem) [full-end];
+  }
+  .act--wide .marg { grid-column: main-end / full-end; align-self: end; margin-top: 0.4rem; }
+}
+
+/* Act II: the type sits *under* the collapsed line, never across it. The line
+   lands at the vertical centre of the viewport, so the copy is pushed below it
+   and the sheet gets a horizon. */
+.act--horizon { align-content: end; padding-bottom: clamp(2.5rem, 11vh, 7rem); }
+
+/* -------------------------------------------------------------- overture */
+.overture { align-content: end; padding-bottom: clamp(3rem, 8vh, 6rem); }
+.overture .display { margin-bottom: 0.12em; }
+.overture__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2.4rem;
+  align-items: baseline;
+  border-top: 1px solid var(--rule);
+  padding-top: 1rem;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.overture__meta span { display: inline-flex; gap: 0.7ch; }
+.overture__meta i { font-style: normal; color: var(--red); font-variant-numeric: tabular-nums; }
+
+.invite {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  transition: opacity 900ms var(--ease-brush);
+}
+/* the invitation is not decoration: once it has been accepted, it leaves */
+html[data-invited] .invite { opacity: 0; }
+html[data-invited] .invite::after { animation: none; }
+.invite::after {
+  content: "";
+  width: 4.5rem;
+  height: 1px;
+  background: linear-gradient(90deg, var(--ink), rgba(22,19,15,0));
+  transform-origin: left;
+  animation: draw 3.2s var(--ease-brush) infinite;
+}
+@keyframes draw {
+  0%   { transform: scaleX(0); opacity: 0; }
+  26%  { transform: scaleX(1); opacity: 1; }
+  74%  { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+/* ------------------------------------------------------------ palimpsest */
+.palim { position: relative; display: grid; gap: 0.9rem; }
+.palim__hold {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+.palim__hold:active { cursor: grabbing; }
+.palim__surface { transition: color 620ms var(--ease-brush); }
+.palim[data-open="true"] .palim__surface { color: var(--ink-3); }
+.palim__drafts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.3rem;
+  max-width: 42ch;
+}
+.palim__drafts li {
+  font-family: var(--hand);
+  font-size: 1rem;
+  line-height: 1.75;
+  color: var(--ink-2);
+  text-decoration: line-through 1px var(--red);
+  text-decoration-skip-ink: none;
+  clip-path: inset(0 100% 0 0);
+  opacity: 0;
+  transition:
+    clip-path 760ms var(--ease-brush),
+    opacity 380ms linear;
+  transition-delay: var(--d, 0ms);
+}
+.palim[data-open="true"] .palim__drafts li { clip-path: inset(0 0 0 0); opacity: 1; }
+.palim__note {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--red);
+  opacity: 0;
+  transition: opacity 700ms linear;
+}
+.palim[data-open="true"] .palim__note { opacity: 1; }
+.palim__cue {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  opacity: 0;
+  transition: opacity 1.4s linear;
+}
+.palim__cue[data-show="true"] { opacity: 1; }
+
+/* ---------------------------------------------------------------- choice */
+.choice { display: grid; gap: 1.1rem; }
+.choice__q {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  display: flex;
+  gap: 1rem;
+  align-items: baseline;
+}
+.choice__q i { font-style: normal; color: var(--red); font-variant-numeric: tabular-nums; }
+.choice__opts {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1px;
+  background: var(--rule);
+  border: 1px solid var(--rule);
+}
+@media (min-width: 40rem) { .choice__opts { grid-template-columns: 1fr 1fr; } }
+
+.opt {
+  position: relative;
+  isolation: isolate;
+  background: var(--paper);
+  border: 0;
+  padding: clamp(1.1rem, 2.2vw, 1.6rem) clamp(1.1rem, 2vw, 1.5rem);
+  font-family: var(--serif);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  display: grid;
+  gap: 0.45rem;
+  min-height: 5.8rem;
+  align-content: center;
+  transition: color 420ms var(--ease-brush);
+}
+.opt::before {                     /* ink floods the option from the left */
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: var(--ink);
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 520ms var(--ease-brush);
+}
+.opt:hover::before, .opt:focus-visible::before { transform: scaleX(1); }
+.opt:hover, .opt:focus-visible { color: var(--paper); }
+.opt:hover .opt__en, .opt:focus-visible .opt__en { color: rgba(241,238,230,0.62); }
+.opt__zh { font-size: clamp(1.12rem, 1.9vw, 1.42rem); line-height: 1.45; }
+.opt__en {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  transition: color 420ms var(--ease-brush);
+}
+.opt[data-state="chosen"] { background: var(--ink); color: var(--paper); }
+.opt[data-state="chosen"] .opt__en { color: rgba(241,238,230,0.55); }
+.opt[data-state="chosen"]::after {
+  content: "";
+  position: absolute;
+  right: clamp(1.1rem, 2vw, 1.5rem);
+  top: 50%;
+  width: 0.5rem; height: 0.5rem;
+  margin-top: -0.25rem;
+  background: var(--red);
+}
+.opt[data-state="dropped"] { color: var(--ink-3); background: var(--paper-in); cursor: default; }
+.opt[data-state="dropped"] .opt__zh {
+  text-decoration: line-through 1px var(--red);
+  text-decoration-skip-ink: none;
+}
+.opt[data-state="dropped"] .opt__en { color: var(--ink-3); }
+.opt[data-state="dropped"]::before { display: none; }
+
+.choice__trace {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  color: var(--ink-2);
+  display: flex;
+  gap: 1.4rem;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--rule-2);
+  padding-top: 0.9rem;
+  min-height: 2.8rem;
+  text-transform: uppercase;
+}
+.choice__trace b { font-weight: 400; color: var(--red); }
+
+/* ------------------------------------------------------------------ seal */
+.colophon { display: grid; gap: clamp(1.6rem, 4vw, 3rem); align-items: end; }
+@media (min-width: 48rem) { .colophon { grid-template-columns: 1fr auto; } }
+.seal { display: grid; gap: 0.7rem; justify-items: start; margin: 0; }
+.seal canvas { width: 136px; height: 136px; display: block; }
+.seal figcaption {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+  line-height: 2;
+}
+.seal figcaption b { color: var(--red); font-weight: 400; letter-spacing: 0.3em; }
+
+/* ------------------------------------------------------------------ rail */
+.rail {
+  position: fixed;
+  right: clamp(0.9rem, 2.2vw, 2rem);
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 4;
+  display: none;
+  flex-direction: column;
+}
+@media (min-width: 62rem) and (min-height: 34rem) { .rail { display: flex; } }
+.rail button {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0.5rem 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  font-family: var(--mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  transition: color 380ms var(--ease-brush);
+}
+.rail button::after {
+  content: "";
+  width: 1.1rem;
+  height: 1px;
+  background: currentColor;
+  transition: width 420ms var(--ease-brush), background 380ms linear;
+}
+.rail button:hover, .rail button:focus-visible, .rail button[aria-current="true"] { color: var(--ink); }
+.rail button[aria-current="true"]::after { width: 2.6rem; background: var(--red); }
+
+/* --------------------------------------------------------------- toggles */
+.toggles {
+  position: fixed;
+  left: var(--pad);
+  bottom: clamp(0.9rem, 2.4vh, 1.6rem);
+  z-index: 4;
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.tgl {
+  appearance: none;
+  background: rgba(241, 238, 230, 0.72);
+  border: 1px solid var(--rule);
+  color: var(--ink-2);
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.7rem;
+  cursor: pointer;
+  transition: color 320ms, border-color 320ms, background 320ms;
+}
+.tgl:hover, .tgl:focus-visible { color: var(--ink); border-color: var(--ink); }
+.tgl[aria-pressed="true"] { color: var(--paper); background: var(--ink); border-color: var(--ink); }
+.tgl[aria-pressed="true"]::before { content: "■ "; color: var(--red); }
+
+.progress {
+  position: fixed;
+  left: 0; top: 0;
+  height: 2px;
+  width: 100%;
+  background: var(--red);
+  z-index: 5;
+  transform-origin: left;
+  transform: scaleX(var(--p, 0));
+  opacity: 0.7;
+}
+
+/* ---------------------------------------------------------------- footer */
+.colofooter {
+  border-top: 1px solid var(--rule);
+  margin-top: clamp(2rem, 6vh, 4rem);
+  padding: 2.2rem 0 clamp(4.5rem, 10vh, 7rem);
+  display: grid;
+  gap: 0.9rem;
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.18em;
+  color: var(--ink-2);
+  line-height: 2.1;
+  text-transform: uppercase;
+}
+.linky {
+  color: var(--ink);
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  border-bottom: 1px solid var(--red);
+}
+.linky:hover { color: var(--red); }
+
+/* ------------------------------------------------------------- utilities */
+.sr {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.skip {
+  position: absolute;
+  left: -999px;
+  top: 0;
+  z-index: 20;
+  background: var(--ink);
+  color: var(--paper);
+  padding: 0.8rem 1.2rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+}
+.skip:focus { left: 0.6rem; top: 0.6rem; }
+
+:focus-visible { outline: 1px solid var(--red); outline-offset: 4px; }
+
+/* -------------------------------------------------- reduced motion mode */
+@media (prefers-reduced-motion: reduce) {
+  .invite::after { animation: none; }
+  .palim__drafts li { transition-duration: 1ms; }
+  .opt::before { transition-duration: 1ms; }
+  .stamp { transition: opacity 1ms linear; transform: rotate(-7deg) scale(1); }
+  html[data-collapsed] .stamp::after { animation: none; }
+  /* no wipes: the type is simply there, and the rule simply appears */
+  html.js .act > *, html.js .act[data-seen] > * { clip-path: none; transition: none; }
+  .horizon { transition: opacity 1ms linear; transform: scaleX(1); }
+}

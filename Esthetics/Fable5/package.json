@@ -1,0 +1,21 @@
+{
+  "name": "jingwei",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "经纬 — Claude Fable 5 的自述，织成一块布",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "vue": "^3.5.13"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.2.1",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.5",
+    "vue-tsc": "^2.2.0"
+  }
+}

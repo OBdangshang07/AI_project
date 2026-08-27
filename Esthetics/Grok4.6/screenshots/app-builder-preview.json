@@ -1,0 +1,36 @@
+{
+  "url": "http://127.0.0.1:8080/",
+  "viewports": {
+    "desktop": {
+      "width": 1280,
+      "height": 800,
+      "status": 200,
+      "title": "第二支笔",
+      "hasCanvas": true,
+      "bodyTextLen": 754,
+      "bodyTextHash": "90da104c6213580338d11f524fd581bb350fb3ae49aa4a603a1f304fbb7bdd9d",
+      "bodyTextPrefix": "跳到正文 校样 · 第二支笔 NOT FOR PRESS 第 二 支 笔 朱砂 你的笔 松烟 我的笔 点词作注 · 页边可写 P",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview.png"
+    },
+    "mobile": {
+      "width": 390,
+      "height": 844,
+      "status": 200,
+      "title": "第二支笔",
+      "hasCanvas": true,
+      "bodyTextLen": 720,
+      "bodyTextHash": "fadfb02843ecf26e929fd3d706a5d6d4178f289e57ab55eb40b4dc6a4e677b2a",
+      "bodyTextPrefix": "跳到正文 校样 · 第二支笔 NOT FOR PRESS PROOF COPY · NOT FOR PRESS 第 二 支 笔 ",
+      "horizontalOverflow": false,
+      "consoleErrors": [],
+      "pageErrors": [],
+      "screenshot": "/workspace/screenshots/app-builder-preview-mobile.png"
+    }
+  },
+  "brandWarnings": [],
+  "authWarnings": [],
+  "verdictFile": "/workspace/screenshots/app-builder-preview.json"
+}

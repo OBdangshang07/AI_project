@@ -1,0 +1,508 @@
+/* ————————————————————————————————
+   成器 · 设计令牌
+   材质：纸 / 墨 / 陶 / 釉 / 金
+   纪律：金只出现在修补处；印泥红只出现在印章与焦点环
+———————————————————————————————— */
+:root {
+  --paper: #f4efe6;
+  --paper-card: #f9f5eb;
+  --paper-deep: #eae2d2;
+  --ink: #26211a;
+  --ink-soft: #6f6454;
+  --ink-faint: #a2957f;
+  --hairline: #d9d0bc;
+  --clay: #b07a52;
+  --clay-deep: #96603f;
+  --celadon: #6f8876;
+  --gold: #c9a227;
+  --seal: #b5483a;
+
+  --font-display: "Songti SC", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", Georgia, serif;
+  --font-body: "PingFang SC", "Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+  --font-latin: Georgia, "Times New Roman", serif;
+
+  --tag-w: 410px;
+  --ease-out: cubic-bezier(0.22, 0.9, 0.3, 1);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { color-scheme: light; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.95;
+  letter-spacing: 0.02em;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* 纸的纤维 —— 唯一的一层材质噪点，克制 */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.55 0 0 0 0 0.5 0 0 0 0 0.42 0 0 0 0.05 0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 240px 240px;
+}
+
+::selection { background: var(--clay-deep); color: var(--paper); }
+
+/* ———— 画布舞台 ———— */
+.stage-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: pan-y;
+}
+
+/* ———— 内容层 ———— */
+main {
+  position: relative;
+  z-index: 1;
+  pointer-events: none; /* 空白处的指针落到陶轮上 */
+}
+main a, main button, main .tag { pointer-events: auto; }
+
+.chapter { position: relative; padding: 0 0 8vh 6vw; }
+
+.chapter-inner {
+  position: sticky;
+  top: 11vh;
+  width: min(var(--tag-w), 88vw);
+  padding-bottom: 5vh;
+}
+
+/* ———— 纸签（吊牌） ———— */
+.tag {
+  position: relative;
+  background: var(--paper-card);
+  border: 1px solid var(--hairline);
+  border-radius: 2px;
+  padding: 26px 34px 24px 28px;
+  box-shadow: 0 1px 0 rgba(38, 33, 26, 0.05), 0 6px 18px -14px rgba(38, 33, 26, 0.35);
+}
+.tag + .tag { margin-top: 20px; }
+.tag.tilt-l { transform: rotate(-0.35deg); }
+.tag.tilt-r { transform: rotate(0.3deg); }
+
+/* 穿绳孔 —— 在右上角，绳从这里牵向陶轮 */
+.tag::before {
+  content: "";
+  position: absolute;
+  right: 11px;
+  top: 14px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--paper);
+  border: 2px solid var(--ink-faint);
+  box-shadow: inset 0 1px 1px rgba(38, 33, 26, 0.25);
+}
+
+.tag h2 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.4;
+  letter-spacing: 0.06em;
+  margin-bottom: 2px;
+}
+.tag .latin {
+  font-family: var(--font-latin);
+  font-style: italic;
+  font-size: 13px;
+  letter-spacing: 0.13em;
+  color: var(--ink-soft);
+  display: block;
+  margin-bottom: 14px;
+}
+.tag p { color: var(--ink); }
+.tag p + p { margin-top: 10px; }
+.tag .soft { color: var(--ink-soft); font-size: 15px; }
+.tag .hint { margin-top: 14px; font-size: 14px; color: var(--ink-soft); }
+.tag .hint::before { content: "— "; color: var(--ink-faint); }
+
+/* ———— 线下划的按钮 ———— */
+.thread-btn {
+  appearance: none;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 2px 0;
+  letter-spacing: 0.04em;
+  background-image: linear-gradient(currentColor, currentColor);
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 100% 1px;
+  transition: color 0.25s var(--ease-out);
+}
+.thread-btn:hover { color: var(--clay-deep); }
+.thread-btn:active { transform: translateY(0.5px); }
+.thread-btn[disabled] { opacity: 0.35; cursor: default; }
+.thread-btn.gold { color: #8a6f1c; }
+
+:focus-visible {
+  outline: 2px solid var(--seal);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+/* ———— 书脊导航（竖排如线签） ———— */
+.spine {
+  position: fixed;
+  right: max(12px, env(safe-area-inset-right));
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.spine button {
+  appearance: none;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--ink-faint);
+  padding: 3px 7px;
+  position: relative;
+  transition: color 0.3s var(--ease-out);
+}
+.spine button::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: -7px;
+  width: 0;
+  height: 1px;
+  background: var(--seal);
+  transition: width 0.3s var(--ease-out);
+}
+.spine button.on { color: var(--ink); }
+.spine button.on::after { width: 9px; }
+.spine button:hover { color: var(--ink); }
+
+/* ———— 左下角开关坞 ———— */
+.dock {
+  position: fixed;
+  left: max(14px, env(safe-area-inset-left));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  z-index: 2;
+  display: flex;
+  gap: 14px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  background: color-mix(in srgb, var(--paper) 88%, transparent);
+  border: 1px solid var(--hairline);
+  border-radius: 3px;
+  padding: 2px 10px;
+}
+.dock button {
+  appearance: none;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  letter-spacing: 0.1em;
+  padding: 4px 2px;
+}
+.dock button b { font-weight: 400; color: var(--ink); }
+.dock button:hover b { color: var(--clay-deep); }
+
+/* ———— 印章 ———— */
+.seal {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  background: var(--seal);
+  color: var(--paper);
+  font-family: var(--font-display);
+  font-size: 23px;
+  line-height: 1;
+  border-radius: 4px;
+  vertical-align: middle;
+  margin-left: 18px;
+  box-shadow: inset 0 0 0 2px rgba(244, 239, 230, 0.35);
+}
+.hero-title .seal { transform: translateY(-0.9em); width: 42px; height: 42px; font-size: 25px; }
+
+/* ———— 首屏 ———— */
+.hero {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  padding-top: 15svh;
+}
+.hero-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(84px, 15vw, 176px);
+  line-height: 1.06;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+}
+.hero-sub {
+  margin-top: 3.5vh;
+  font-family: var(--font-display);
+  font-size: clamp(20px, 2.6vw, 27px);
+  letter-spacing: 0.1em;
+}
+.hero-latin {
+  margin-top: 10px;
+  font-family: var(--font-latin);
+  font-style: italic;
+  font-size: 13.5px;
+  letter-spacing: 0.2em;
+  color: var(--ink-soft);
+}
+.hero-stage { height: 0; }
+.hero-intro {
+  margin-top: 4vh;
+  max-width: 27em;
+  color: var(--ink-soft);
+  font-size: 15.5px;
+}
+.hero-hint {
+  margin-top: auto;
+  padding-bottom: 7svh;
+  font-size: 14px;
+  color: var(--ink-soft);
+  letter-spacing: 0.08em;
+}
+
+/* ———— 原则（定中心）列表 ———— */
+.principles { list-style: none; margin-top: 8px; }
+.principles li { border-top: 1px solid var(--hairline); }
+.principles li:last-child { border-bottom: 1px solid var(--hairline); }
+.principles .p-head {
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  background: none;
+  border: none;
+  font: inherit;
+  color: var(--ink);
+  cursor: pointer;
+  padding: 12px 2px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  letter-spacing: 0.04em;
+}
+.principles .p-head .no {
+  font-family: var(--font-latin);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--ink-faint);
+  min-width: 1.4em;
+}
+.principles .p-head:hover .p-title { color: var(--clay-deep); }
+.principles li.open .p-title { color: var(--clay-deep); }
+.principles .p-body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.32s var(--ease-out);
+}
+.principles li.open .p-body { grid-template-rows: 1fr; }
+.principles .p-body > div { overflow: hidden; }
+.principles .p-body p {
+  padding: 0 2px 14px 2.6em;
+  color: var(--ink-soft);
+  font-size: 15px;
+}
+
+/* ———— 塑 · 问题列表 ———— */
+.questions { display: flex; flex-direction: column; margin-top: 10px; list-style: none; padding: 0; }
+.q-item { border-top: 1px solid var(--hairline); }
+.q-item:last-child { border-bottom: 1px solid var(--hairline); }
+.q-btn {
+  width: 100%;
+  appearance: none;
+  background: none;
+  border: none;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  padding: 11px 2px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink);
+  letter-spacing: 0.04em;
+}
+.q-btn:hover:not([disabled]) { color: var(--clay-deep); }
+.q-btn[disabled] { cursor: default; }
+.q-btn .state {
+  margin-left: auto;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+  letter-spacing: 0.1em;
+}
+.q-item.done .q-btn { color: var(--ink-soft); }
+.q-item.active .q-btn .state { color: var(--clay-deep); }
+
+/* 转出来的回答 */
+.answers { margin-top: 16px; }
+.answer { margin-bottom: 15px; }
+.answer .a-q {
+  font-size: 13px;
+  color: var(--ink-faint);
+  letter-spacing: 0.12em;
+  margin-bottom: 4px;
+}
+.answer .a-line {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 17.5px;
+  line-height: 1.9;
+  letter-spacing: 0.05em;
+  color: #4a3b2e;
+}
+
+/* 状态行 */
+.make-status {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 16px;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+
+/* 窑 · 旁白 */
+.narration { min-height: 3.4em; }
+.narration .n-line {
+  font-family: var(--font-display);
+  font-size: 18px;
+  letter-spacing: 0.06em;
+}
+.narration .n-line.crack { color: var(--seal); }
+.narration .n-line.gold { color: #8a6f1c; }
+.skip-link {
+  font-size: 13px;
+  color: var(--ink-faint);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px;
+  letter-spacing: 0.1em;
+}
+.skip-link:hover { color: var(--ink); }
+
+/* 静态旁白（减少动态时全部列出） */
+.narration-static p {
+  font-family: var(--font-display);
+  font-size: 16.5px;
+  letter-spacing: 0.05em;
+  margin-top: 6px;
+}
+
+/* ———— 金的注记 ———— */
+.gold-note {
+  border-left: 2px solid var(--gold);
+  padding: 6px 0 6px 16px;
+  margin-top: 14px;
+  color: var(--ink-soft);
+  font-size: 15px;
+}
+
+/* ———— 器物档案 ———— */
+.colophon {
+  font-family: var(--font-display);
+  letter-spacing: 0.08em;
+  line-height: 2.2;
+  font-size: 15.5px;
+}
+.colophon .no { font-family: var(--font-latin); font-style: italic; }
+.colophon-card { position: relative; }
+.colophon-card .seal { position: absolute; right: 22px; bottom: 20px; margin: 0; }
+
+/* ———— 章节高度（滚动的呼吸） ———— */
+.ch-hero { min-height: 118svh; }
+.ch-center { min-height: 175vh; }
+.ch-shape { min-height: 235vh; }
+.ch-kiln { min-height: 205vh; }
+.ch-vessel { min-height: 150vh; }
+
+.duet-line { margin-top: 14px; }
+.duet-line .hold-btn { margin-left: 10px; }
+.duet-line .kbd-note { display: block; font-size: 12.5px; }
+.cut-row { margin-top: 12px; }
+.save-row { margin-top: 10px; }
+.after-cut { margin-top: 8px; }
+.colophon-title { font-size: 19px; }
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+footer {
+  position: relative;
+  z-index: 1;
+  padding: 8vh 6vw 12vh;
+  color: var(--ink-faint);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  line-height: 2.2;
+  pointer-events: auto;
+}
+
+/* ———— 无动效模式 ———— */
+html.calm .thread-btn,
+html.calm .spine button,
+html.calm .p-body { transition: none !important; }
+
+/* ———— 移动端 ———— */
+@media (max-width: 880px) {
+  body { font-size: 15.5px; }
+  .chapter { padding-left: 5vw; padding-right: 5vw; }
+  /* 移动端：不再 sticky——每章先给舞台留出上半屏，随后内容自然上卷 */
+  .chapter-inner {
+    position: static;
+    width: 100%;
+    padding-top: 52svh;
+    padding-bottom: 88px;
+  }
+  /* 首屏重排：标题—副题—舞台窗—小注—导语（泥团有自己的空场） */
+  .hero { display: flex; flex-direction: column; }
+  .hero-title { order: 1; }
+  .hero-sub { order: 2; }
+  .hero-stage { order: 3; height: 24svh; }
+  .hero-latin { order: 4; margin-top: 0; }
+  .hero-intro { order: 5; margin-top: 12px; }
+  .hero-hint { order: 6; }
+  .hero-title .seal { width: 32px; height: 32px; font-size: 19px; margin-left: 10px; }
+  .tag { padding: 20px 20px 18px 38px; }
+  .hero { padding-top: 10svh; }
+  .hero-title { font-size: clamp(68px, 20vw, 120px); }
+  .hero-intro { max-width: 100%; }
+  .spine { right: 4px; gap: 12px; }
+  .spine button { font-size: 13px; padding: 2px 4px; letter-spacing: 0.2em; }
+  :root { --tag-w: 100%; }
+}
